@@ -1,0 +1,22 @@
+# BORG Core Worker - Variables de Desarrollo Local
+# Copiar a .dev.vars y rellenar con valores reales
+# Ejecutar: cd borg-core-worker && cp .dev.vars.example .dev.vars
+
+# === TELEGRAM BOT TOKENS ===
+FRONTEND_BOT_TOKEN="REDACTED"
+BACKEND_BOT_TOKEN="REDACTED"
+
+# === TELEGRAM ADMIN ===
+TELEGRAM_ADMIN_IDS="REDACTED"
+
+# === AUTENTICACIÓN UNIFICADA ===
+BORG_SECRET_KEY="REDACTED"
+
+# === GEMINI AI ===
+GEMINI_API_KEY="REDACTED"
+
+# === WHATSAPP (Meta Cloud API) ===
+WHATSAPP_ACCESS_TOKEN="REDACTED"
+WHATSAPP_APP_SECRET="REDACTED"
+WHATSAPP_VERIFY_TOKEN="REDACTED"
+WHATSAPP_PHONE_NUMBER_ID="REDACTED"

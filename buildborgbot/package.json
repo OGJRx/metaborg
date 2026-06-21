@@ -1,0 +1,38 @@
+{
+  "name": "buildborgbot",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "vitest run"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/OGJRx/buildborgbot.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "engines": {
+    "node": ">=24"
+  },
+  "bugs": {
+    "url": "https://github.com/OGJRx/buildborgbot/issues"
+  },
+  "homepage": "https://github.com/OGJRx/buildborgbot#readme",
+  "dependencies": {
+    "@google/genai": "^2.8.0",
+    "@grammyjs/conversations": "^2.1.1",
+    "@grammyjs/storage-cloudflare": "^2.4.2",
+    "grammy": "^1.44.0",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.5.0",
+    "@cloudflare/workers-types": "^4.20260613.1",
+    "miniflare": "^4.20260611.0",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.8",
+    "wrangler": "^4.100.0"
+  }
+}

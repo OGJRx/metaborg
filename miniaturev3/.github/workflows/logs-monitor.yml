@@ -1,0 +1,93 @@
+name: 📡 Wrangler Logs Monitor
+
+on:
+  workflow_dispatch:
+    inputs:
+      duration:
+        description: "Duration in minutes"
+        required: true
+        default: "9"
+        type: choice
+        options:
+          - "1"
+          - "2"
+          - "3"
+          - "5"
+          - "9"
+          - "10"
+          - "15"
+
+env:
+  NODE_VERSION: "24"
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  monitor-logs:
+    name: 📡 Capture Raw Logs
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+
+      - run: npm ci
+
+      - name: 🔐 Verify Cloudflare authentication
+        working-directory: borg-core-worker
+        run: |
+          echo "🔍 Verificando OIDC con Cloudflare..."
+          npx wrangler whoami
+          echo "📦 Verificando worker desplegado..."
+          npx wrangler deployments list || echo "⚠️ No se pudo listar deployments (posible falta de permisos 'Workers Scripts:Read')"
+        env:
+          CLOUDFLARE_API_TOKEN: ""
+
+      - name: 📁 Create logs directory
+        run: mkdir -p logs
+
+      - name: 📡 Monitor Worker Logs
+        run: |
+          TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+          LOG_FILE="logs/raw-core-${TIMESTAMP}.log"
+          DURATION=${{ github.event.inputs.duration }}
+          DURATION_SECS=$((DURATION * 60))
+
+          echo "🔍 Starting log capture for ${DURATION} minutes..."
+
+          # Heartbeat cada 30s para mantener WebSocket vivo
+          (while true; do echo "💓 Heartbeat: $(date -Iseconds)"; sleep 30; done) &
+          HEARTBEAT_PID=$!
+
+          cd borg-core-worker
+          timeout ${DURATION_SECS}s npx wrangler tail --format json 2>&1 | tee "../${LOG_FILE}" || true
+          cd ..
+
+          kill $HEARTBEAT_PID 2>/dev/null || true
+
+          if [ -s "${LOG_FILE}" ]; then
+            echo "✅ Logs: $(wc -l < ${LOG_FILE}) entries"
+          else
+            echo "⚠️ No logs captured"
+            echo "# No logs captured - $(date -Iseconds)" > "${LOG_FILE}"
+          fi
+        env:
+          CLOUDFLARE_API_TOKEN: ""
+
+      - name: 📤 Upload logs artifact
+        uses: actions/upload-artifact@v5
+        with:
+          name: wrangler-logs-${{ github.run_id }}
+          path: logs/
+          retention-days: 30

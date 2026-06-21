@@ -1,0 +1,42 @@
+{
+  "name": "borg-monorepo",
+  "version": "9.7.0-TITANIUM",
+  "type": "module",
+  "private": true,
+  "description": "Monorepo for the BORGPTRON project",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "prepare": "husky install",
+    "deploy": "./titanium deploy",
+    "lint": "eslint . --quiet --fix",
+    "lint:strict": "eslint . --max-warnings 10",
+    "format": "npm run format --workspaces --if-present",
+    "check-types": "npm run check-types --workspaces",
+    "predeploy": "npm run check-types --workspaces",
+    "hotfix:typescript": "npm install --save-dev typescript@5.4.5 --workspaces && npm run check-types --workspaces",
+    "any-scanner": "grep -rE \": any\\b|<any>|as any|\\bany\\[\\]\" shared/ borg-core-worker/src/ 2>/dev/null | wc -l || echo 0",
+    "verify:requirements": "echo 'Verifying TypeScript version...' && (npx tsc --version | grep '5.4.5') && echo 'Verifying Zod implementation...' && (find shared -name '*.ts' -print0 | xargs -0 grep 'import') && echo 'All requirements verified.'"
+  },
+  "workspaces": [
+    "borg-core-worker"
+  ],
+  "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "^0.14.7",
+    "@cloudflare/workers-types": "^4.20260426.1",
+    "@eslint/js": "^10.0.1",
+    "@grammyjs/types": "^3.26.0",
+    "@vitest/coverage-v8": "^4.1.1",
+    "eslint": "^10.2.1",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-prettier": "^5.5.5",
+    "husky": "^8.0.0",
+    "prettier": "^3.2.4",
+    "typescript": "5.4.5",
+    "typescript-eslint": "^8.58.2",
+    "vitest": "^4.1.5",
+    "wrangler": "^4.71.0",
+    "zod": "3.22.4"
+  }
+}

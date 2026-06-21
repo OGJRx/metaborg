@@ -1,0 +1,22 @@
+#!/bin/sh
+. "$(dirname "$0")/_/husky.sh"
+
+echo "Running pre-commit hooks..."
+
+# Run linting and formatting for all workers
+npm run lint --workspaces --if-present
+npm run format --workspaces --if-present
+
+# Run tests related to changed files
+npx vitest --run --passWithNoTests
+
+# Any-Scanner: The Dictate of Blood (v8.1.0)
+echo "Executing Any-Scanner (Limit: 0)..."
+ANY_COUNT=$(grep -rE ": any\b|<any>|as any|\bany\[\]" shared/ borg-core-worker/src/ 2>/dev/null | wc -l)
+if [ "$ANY_COUNT" -gt 0 ]; then
+  echo "🔴 ERROR: Blood Dictate Violated! Detected $ANY_COUNT 'any' usages (Limit: 0)."
+  echo "Purge your code before committing."
+  exit 1
+fi
+
+echo "Pre-commit checks passed!"

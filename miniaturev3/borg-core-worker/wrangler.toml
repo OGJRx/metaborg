@@ -1,0 +1,55 @@
+name = "4agentsonline"
+main = "src/index.ts"
+compatibility_date = "2025-01-24"
+compatibility_flags = ["nodejs_compat"]
+
+[vars]
+# Secretos (Configurar vía: wrangler secret put <NAME>)
+# - FRONTEND_BOT_TOKEN
+# - BACKEND_BOT_TOKEN
+# - BORG_SECRET_KEY: MUST be a standalone 32-byte hex string (NOT a Cloudflare API token). Generate with scripts/rotate-borg-secret.sh.
+# - GEMINI_API_KEY: Acceso directo a Google AI
+
+# TELEGRAM_ADMIN_IDS movido a secret
+AI_MODEL_NAME = "gemini-3.1-flash-lite"
+BORG_VERSION = "9.7.0-TITANIUM"
+
+# Worker URL (public endpoint)
+WORKER_URL = "https://4agentsonline.marketceogjr.workers.dev"
+
+# WhatsApp Config
+WHATSAPP_API_VERSION = "v25.0"
+# NOTE: WHATSAPP_VERIFY_TOKEN is visible in Cloudflare Workers logs during webhook validation challenges.
+# This is a low-risk exposure as it only validates webhook ownership to Meta.
+
+
+[[d1_databases]]
+binding = "DB"
+database_name = "borg"
+database_id = "f93be66c-cfd1-4f03-a698-57d5938ac156"
+migrations_dir = "migrations"
+
+[[d1_databases]]
+binding = "OBD_DB"
+database_name = "borg-obd-db"
+database_id = "5b34038c-b2e0-45db-af6f-cf7c5fc89975"
+
+[triggers]
+crons = [
+  "*/10 * * * *"    # Master Cron (Unified Dispatcher)
+]
+
+[observability]
+enabled = true
+head_sampling_rate = 1
+
+[observability.logs]
+enabled = true
+head_sampling_rate = 1
+persist = true
+invocation_logs = true
+
+[observability.traces]
+enabled = true
+persist = true
+head_sampling_rate = 1

@@ -1,0 +1,70 @@
+# Archive and Logs
+archive/
+*.log
+*capture*.json
+tail_*.json
+research_plan.json
+skills-lock.json
+
+# Local Memory and Strategy
+MEMORY.md
+GEMINI.md
+
+# Node
+node_modules/
+dist/
+.wrangler/
+.tmp/
+*.tsbuildinfo
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Local Environment Configurations
+.dev.vars
+.env
+.env.local
+.env.*
+!.env.example
+
+# Editor
+.idea/
+.vscode/
+*.swp
+*.swo
+
+.gemini/
+gha-creds-*.json
+borg_core_state.json
+coverage/
+.openclaude-profile.json
+
+# InsForge & AI agent skills
+.insforge
+.agent
+.agents
+.augment
+.claude
+.cline
+.github/copilot*
+.kilocode
+.qoder
+.qwen
+.roo
+.trae
+.windsurf
+.continue/
+skills-lock.json
+
+# Logs y sesiones operativas
+logs/
+session-*.md
+*.wrangler-logs*.json
+conductor/
+borg-core-worker/worker_logs.json
+.worktrees
+
+# Local documentation environment folders
+/docs/
+/conductor/
+__pycache__/

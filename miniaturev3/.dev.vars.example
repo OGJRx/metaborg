@@ -1,0 +1,21 @@
+# BORGPTRON - Variables de Desarrollo Local
+# Copiar a .dev.vars y rellenar con valores reales
+
+# === TELEGRAM BOT TOKENS ===
+FRONTEND_BOT_TOKEN=tu_frontend_bot_token_aqui
+BACKEND_BOT_TOKEN=tu_backend_bot_token_aqui
+
+# === GEMINI AI ===
+GEMINI_API_KEY=tu_gemini_api_key_aqui
+
+# === TELEGRAM ADMIN ===
+TELEGRAM_ADMIN_IDS=tu_admin_id_aqui
+
+# === AUTENTICACIÓN UNIFICADA (v9.7.0-TITANIUM) ===
+BORG_SECRET_KEY=tu_secreto_maestro_aqui
+
+# === WHATSAPP (Meta Cloud API) ===
+WHATSAPP_ACCESS_TOKEN=tu_access_token_aqui
+WHATSAPP_APP_SECRET=tu_app_secret_aqui
+WHATSAPP_VERIFY_TOKEN=tu_verify_token_aqui
+WHATSAPP_PHONE_NUMBER_ID=tu_phone_number_id_aqui

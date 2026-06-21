@@ -1,0 +1,289 @@
+# ═══════════════════════════════════════════════════════════════
+# 🔱 TITANIUM CORE — Unified Pipeline v9.7.0
+# ═══════════════════════════════════════════════════════════════
+#
+# DEFAULT_BRANCH: branch que se despliega a produccion.
+#   Cambiar este valor para apuntar a otra rama default.
+#   No requiere cambiar nada mas en el workflow.
+#
+# La rama definida aqui ES el repositorio principal que se
+# despliega. Cualquier otra rama solo genera PR checks.
+# ═══════════════════════════════════════════════════════════════
+
+name: 🔱 TITANIUM CORE - Unified Pipeline
+
+on:
+  push:
+    branches: ["borg"]
+  pull_request:
+    branches: ["borg"]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  NODE_VERSION: "24"
+  DEFAULT_BRANCH: "borg"
+
+jobs:
+  entropy-check:
+    name: 🔬 Entropy Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+      - run: npm ci --ignore-scripts
+      - name: 🧹 Check for merge conflict markers
+        run: |
+          set -euo pipefail
+          if git grep -E "^<<<<<<<|^=======|^>>>>>>>" -- . ':(exclude)node_modules'; then
+            echo "❌ Merge conflict markers found in source code!"
+            exit 1
+          fi
+      - name: 🔍 Any Scanner
+        run: |
+          set -euo pipefail
+          ANY_COUNT=$(npm run any-scanner --silent | tail -n 1)
+          echo "Any count: $ANY_COUNT"
+          if [ "$ANY_COUNT" -gt 0 ]; then
+            echo "❌ ERROR: Detected $ANY_COUNT 'any' usages. Zero tolerance."
+            exit 1
+          fi
+      - name: 📝 Lint
+        run: |
+          set -euo pipefail
+          npm run lint:strict
+      - name: 📐 Type Check
+        run: npm run check-types
+      - name: 🧪 Tests
+        run: npm run test
+      - name: 🔐 Security Audit
+        run: |
+          set -euo pipefail
+          npm audit --audit-level=high
+          AUDIT_EXIT=$?
+          if [ $AUDIT_EXIT -ne 0 ]; then
+            echo "❌ Security audit failed with exit code $AUDIT_EXIT"
+            exit $AUDIT_EXIT
+          fi
+
+  deploy-core:
+    name: 🚀 Deploy Core
+    runs-on: ubuntu-latest
+    environment: production
+    permissions:
+      contents: read
+      id-token: write
+    needs: entropy-check
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    timeout-minutes: 15
+    env:
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      BORG_SECRET_KEY: ${{ secrets.BORG_SECRET_KEY }}
+      FRONTEND_BOT_TOKEN: ${{ secrets.FRONTEND_BOT_TOKEN }}
+      BACKEND_BOT_TOKEN: ${{ secrets.BACKEND_BOT_TOKEN }}
+      TELEGRAM_ADMIN_IDS: ${{ secrets.TELEGRAM_ADMIN_IDS }}
+
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+      - run: npm ci --ignore-scripts
+
+      - name: 🔐 Validate Secrets
+        run: |
+          MISSING=0
+          SECRETS=(
+            "CLOUDFLARE_ACCOUNT_ID"
+            "CLOUDFLARE_API_TOKEN"
+            "GEMINI_API_KEY"
+            "BORG_SECRET_KEY"
+            "FRONTEND_BOT_TOKEN"
+            "BACKEND_BOT_TOKEN"
+            "TELEGRAM_ADMIN_IDS"
+            "WHATSAPP_ACCESS_TOKEN"
+            "WHATSAPP_APP_SECRET"
+            "WHATSAPP_VERIFY_TOKEN"
+            "WHATSAPP_PHONE_NUMBER_ID"
+            "TALLER_LATITUD"
+            "TALLER_LONGITUD"
+            "TALLER_MAPS_URL"
+            "META_APP_ID"
+            "META_APP_ACCESS_TOKEN"
+          )
+          for secret in "${SECRETS[@]}"; do
+            if [ -z "${!secret}" ]; then
+              echo "::error::Missing secret: $secret"
+              MISSING=1
+            fi
+          done
+          if [ $MISSING -eq 1 ]; then
+            exit 1
+          fi
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          BORG_SECRET_KEY: ${{ secrets.BORG_SECRET_KEY }}
+          FRONTEND_BOT_TOKEN: ${{ secrets.FRONTEND_BOT_TOKEN }}
+          BACKEND_BOT_TOKEN: ${{ secrets.BACKEND_BOT_TOKEN }}
+          TELEGRAM_ADMIN_IDS: ${{ secrets.TELEGRAM_ADMIN_IDS }}
+          WHATSAPP_ACCESS_TOKEN: ${{ secrets.WHATSAPP_ACCESS_TOKEN }}
+          WHATSAPP_APP_SECRET: ${{ secrets.WHATSAPP_APP_SECRET }}
+          WHATSAPP_VERIFY_TOKEN: ${{ secrets.WHATSAPP_VERIFY_TOKEN }}
+          WHATSAPP_PHONE_NUMBER_ID: ${{ secrets.WHATSAPP_PHONE_NUMBER_ID }}
+          TALLER_LATITUD: ${{ secrets.TALLER_LATITUD }}
+          TALLER_LONGITUD: ${{ secrets.TALLER_LONGITUD }}
+          TALLER_MAPS_URL: ${{ secrets.TALLER_MAPS_URL }}
+          META_APP_ID: ${{ secrets.META_APP_ID }}
+          META_APP_ACCESS_TOKEN: ${{ secrets.META_APP_ACCESS_TOKEN }}
+
+      - name: Verify D1 Connection
+        run: |
+          npx wrangler d1 execute borg --remote --command "SELECT name FROM sqlite_master WHERE type='table' LIMIT 5"
+        working-directory: borg-core-worker
+
+      - name: 🗄️ Apply D1 Migrations
+        uses: cloudflare/wrangler-action@v3
+        with:
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          command: d1 migrations apply borg --remote
+          workingDirectory: borg-core-worker
+
+      - name: 🔱 Deploy Core Worker
+        id: deploy
+        uses: cloudflare/wrangler-action@v3
+        with:
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          command: deploy
+          workingDirectory: borg-core-worker
+
+      - name: 🔐 Sync Wrangler Secrets
+        uses: cloudflare/wrangler-action@v3
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          BORG_SECRET_KEY: ${{ secrets.BORG_SECRET_KEY }}
+          FRONTEND_BOT_TOKEN: ${{ secrets.FRONTEND_BOT_TOKEN }}
+          BACKEND_BOT_TOKEN: ${{ secrets.BACKEND_BOT_TOKEN }}
+          WHATSAPP_ACCESS_TOKEN: ${{ secrets.WHATSAPP_ACCESS_TOKEN }}
+          WHATSAPP_APP_SECRET: ${{ secrets.WHATSAPP_APP_SECRET }}
+          WHATSAPP_VERIFY_TOKEN: ${{ secrets.WHATSAPP_VERIFY_TOKEN }}
+          TELEGRAM_ADMIN_IDS: ${{ secrets.TELEGRAM_ADMIN_IDS }}
+          WHATSAPP_PHONE_NUMBER_ID: ${{ secrets.WHATSAPP_PHONE_NUMBER_ID }}
+          TALLER_LATITUD: ${{ secrets.TALLER_LATITUD }}
+          TALLER_LONGITUD: ${{ secrets.TALLER_LONGITUD }}
+          TALLER_MAPS_URL: ${{ secrets.TALLER_MAPS_URL }}
+        with:
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          workingDirectory: borg-core-worker
+          secrets: |
+            GEMINI_API_KEY
+            BORG_SECRET_KEY
+            FRONTEND_BOT_TOKEN
+            BACKEND_BOT_TOKEN
+            TELEGRAM_ADMIN_IDS
+            WHATSAPP_ACCESS_TOKEN
+            WHATSAPP_APP_SECRET
+            WHATSAPP_VERIFY_TOKEN
+            WHATSAPP_PHONE_NUMBER_ID
+            TALLER_LATITUD
+            TALLER_LONGITUD
+            TALLER_MAPS_URL
+
+      - name: 🔗 Activate Webhooks
+        working-directory: borg-core-worker
+        env:
+          BORG_SECRET_KEY: ${{ secrets.BORG_SECRET_KEY }}
+          FRONTEND_BOT_TOKEN: ${{ secrets.FRONTEND_BOT_TOKEN }}
+          BACKEND_BOT_TOKEN: ${{ secrets.BACKEND_BOT_TOKEN }}
+          META_APP_ID: ${{ secrets.META_APP_ID }}
+          META_APP_ACCESS_TOKEN: ${{ secrets.META_APP_ACCESS_TOKEN }}
+        run: |
+          set -euo pipefail
+          CORE_URL="${{ steps.deploy.outputs.deployment-url }}"
+
+          # === TELEGRAM WEBHOOKS ===
+          echo "📲 Registering Telegram webhooks..."
+          curl -fsS -X POST "https://api.telegram.org/bot${FRONTEND_BOT_TOKEN}/setWebhook" \
+            -d "url=${CORE_URL}/webhook/frontend" \
+            -d "secret_token=${BORG_SECRET_KEY}" | grep -q '"ok":true' || exit 1
+          echo "✅ Frontend Telegram OK"
+
+          curl -fsS -X POST "https://api.telegram.org/bot${BACKEND_BOT_TOKEN}/setWebhook" \
+            -d "url=${CORE_URL}/webhook/backend" \
+            -d "secret_token=${BORG_SECRET_KEY}" | grep -q '"ok":true' || exit 1
+          echo "✅ Backend Telegram OK"
+
+          # === WHATSAPP WEBHOOK SUBSCRIPTION ===
+          echo "📲 Subscribing WhatsApp Webhook to Meta Graph API..."
+          WA_VERIFY_TOKEN="${{ secrets.WHATSAPP_VERIFY_TOKEN }}"
+          # App Access Token (APP_ID|APP_SECRET) required for subscription endpoint.
+          # User Access Token (EAAN*) only works for /messages, NOT /subscriptions.
+          WA_ACCESS_TOKEN="$META_APP_ACCESS_TOKEN"
+          # Meta uses APP_ID for subscription endpoint, not Phone ID.
+          WA_META_APP_ID="$META_APP_ID"
+
+          # Intentar suscripción WhatsApp (1 retry)
+          WA_SUB_RESULT=$(curl -s -X POST "https://graph.facebook.com/v25.0/$WA_META_APP_ID/subscriptions" \
+            -H "Authorization: Bearer ${WA_ACCESS_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d "{\"object\":\"whatsapp_business_account\",\"callback_url\":\"${CORE_URL}/webhook/whatsapp\",\"verify_token\":\"${WA_VERIFY_TOKEN}\",\"fields\":[\"messages\"]}")
+
+          echo "Meta subscription response: ${WA_SUB_RESULT}"
+
+          if echo "$WA_SUB_RESULT" | grep -q '"success":true'; then
+            echo "✅ WhatsApp Meta subscription OK"
+          else
+            echo "⚠️  WhatsApp subscription failed. Retrying in 5s..."
+            sleep 5
+            WA_SUB_RESULT=$(curl -s -X POST "https://graph.facebook.com/v25.0/$WA_META_APP_ID/subscriptions" \
+              -H "Authorization: Bearer ${WA_ACCESS_TOKEN}" \
+              -H "Content-Type: application/json" \
+              -d "{\"object\":\"whatsapp_business_account\",\"callback_url\":\"${CORE_URL}/webhook/whatsapp\",\"verify_token\":\"${WA_VERIFY_TOKEN}\",\"fields\":[\"messages\"]}")
+            if echo "$WA_SUB_RESULT" | grep -q '"success":true'; then
+              echo "✅ WhatsApp Meta subscription OK (retry)"
+            else
+              echo "::error::WhatsApp Meta subscription failed after retry: ${WA_SUB_RESULT}"
+              exit 1
+            fi
+          fi
+
+          # Verify Worker responds to challenge
+          echo "🔍 Verifying WhatsApp webhook challenge..."
+          CHALLENGE_RESULT=$(curl -s -w "\n%{http_code}" "${CORE_URL}/webhook/whatsapp?hub.mode=subscribe&hub.verify_token=${WA_VERIFY_TOKEN}&hub.challenge=test_verify_2026")
+          CHALLENGE_HTTP=$(echo "$CHALLENGE_RESULT" | tail -1)
+          CHALLENGE_BODY=$(echo "$CHALLENGE_RESULT" | head -n -1)
+
+          if [ "$CHALLENGE_HTTP" = "200" ] && echo "$CHALLENGE_BODY" | grep -q "test_verify_2026"; then
+            echo "✅ WhatsApp challenge verification OK (Worker responds correctly)"
+          else
+            echo "⚠️  Challenge returned HTTP $CHALLENGE_HTTP. Check WHATSAPP_VERIFY_TOKEN is synced as Wrangler secret."
+          fi
+
+          echo "✅ Webhook activation complete"
+
+      - name: 📢 Notify Success
+        if: success()
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          IFS=',' read -ra ADM_IDS <<< "${{ secrets.TELEGRAM_ADMIN_IDS }}"
+          for ADM_ID in "${ADM_IDS[@]}"; do
+            curl -s -X POST "https://api.telegram.org/bot${BACKEND_BOT_TOKEN}/sendMessage" \
+              -d "chat_id=${ADM_ID}" \
+              -d "text=✅ <b>TITANIUM CORE UNIFIED</b>%0A%0ADespliegue y sincronización de webhooks completada con éxito." \
+              -d "parse_mode=HTML"
+          done

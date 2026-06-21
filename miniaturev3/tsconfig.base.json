@@ -1,0 +1,21 @@
+{
+  "compilerOptions": {
+    "target": "esnext",
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "esModuleInterop": true,
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "noPropertyAccessFromIndexSignature": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "types": [],
+    "lib": ["esnext"],
+    "paths": {
+      "@borg/core/*": ["./borg-core-worker/src/*"],
+      "@borg/shared/*": ["./shared/*"]
+    }
+  },
+  "exclude": ["node_modules"]
+}

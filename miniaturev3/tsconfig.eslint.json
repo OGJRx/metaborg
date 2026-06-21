@@ -1,0 +1,22 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "skipLibCheck": true,
+    "lib": ["ESNext"],
+    "types": ["@cloudflare/workers-types", "node"],
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["borg-core-worker/src/*"]
+    }
+  },
+  "include": [
+    "shared/**/*.ts",
+    "borg-core-worker/src/**/*.ts",
+    "tests/**/*.ts",
+    "*.ts"
+  ],
+  "exclude": ["node_modules", "dist", ".wrangler"]
+}
