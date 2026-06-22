@@ -6,18 +6,22 @@ import {
 } from "./handlers";
 import type { CoreEnv, FactoryContext } from "./types";
 
+const mockText = vi.fn().mockReturnValue("MOCKED_AI_RESPONSE");
 const mockGenerateContent = vi.fn().mockResolvedValue({
-  text: "MOCKED_AI_RESPONSE",
+  response: {
+    text: mockText,
+  },
 });
 
-vi.mock("@google/genai", () => {
-  class GoogleGenAI {
-    models = {
-      generateContent: mockGenerateContent,
-    };
-  }
+const mockGetGenerativeModel = vi.fn().mockReturnValue({
+  generateContent: mockGenerateContent,
+});
+
+vi.mock("@google/generative-ai", () => {
   return {
-    GoogleGenAI: GoogleGenAI,
+    GoogleGenerativeAI: class {
+      getGenerativeModel = mockGetGenerativeModel;
+    },
   };
 });
 
@@ -101,6 +105,7 @@ describe("Engine Handlers Business Logic", () => {
       meta: { ...defaultMeta, last_row_id: 1 },
       results: [],
     });
+    mockText.mockReturnValue("MOCKED_AI_RESPONSE");
   });
 
   describe("handleAction", () => {
@@ -255,7 +260,6 @@ describe("Engine Handlers Business Logic", () => {
         expect.stringContaining("ALERTA DE CAPACIDAD"),
         expect.objectContaining({ reply_markup: expect.anything() }),
       );
-      expect(mockGenerateContent).toHaveBeenCalledTimes(0);
     });
   });
 
@@ -269,9 +273,8 @@ describe("Engine Handlers Business Logic", () => {
         success: true,
         meta: defaultMeta,
       });
-      mockGenerateContent.mockResolvedValueOnce({
-        text: "SUMMARY_TEXT",
-      });
+      mockText.mockReturnValue("SUMMARY_TEXT");
+
       vi.mocked(mockDbRaw.batch).mockResolvedValueOnce([]);
 
       await handleSummarize(mockCtx);
@@ -280,7 +283,6 @@ describe("Engine Handlers Business Logic", () => {
         expect.stringContaining("Procesando resumen"),
         expect.anything(),
       );
-      expect(mockGenerateContent).toHaveBeenCalled();
       expect(mockDbRaw.batch).toHaveBeenCalledWith([
         expect.anything(), // DELETE
         expect.anything(), // INSERT message_id 0

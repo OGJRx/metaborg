@@ -21,6 +21,10 @@ export interface FactoryBotConfig {
   system_prompt: string;
   welcome_message: string;
   menu_json: string;
+  bot_kind: "open_chat" | "agendado" | "tool_specialist";
+  config_json: string;
+  meta_phone_number_id?: string;
+  meta_app_secret?: string;
   webhook_secret_hash?: string;
 }
 
@@ -35,6 +39,8 @@ export interface TitaniumSession extends Record<string, unknown> {
   _titaniumEnv?: CoreEnv;
   _titaniumBotId?: string;
   _titaniumHost?: string;
+  step_data?: Record<string, string>;
+  paso_actual?: number;
 }
 
 export type FactoryContext = Context &

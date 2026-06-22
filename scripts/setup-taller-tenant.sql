@@ -1,4 +1,4 @@
-INSERT INTO factory_bots (bot_id, bot_name, slug, bot_kind, config_json, meta_phone_number_id)
+INSERT OR IGNORE INTO factory_bots (bot_id, bot_name, slug, bot_kind, config_json, meta_phone_number_id, system_prompt, welcome_message, menu_json)
 VALUES ('taller_001', 'Taller Titanium', 'taller-titanium', 'agendado', '{
   "business_identity": {
     "name": "Taller Titanium",
@@ -22,4 +22,4 @@ VALUES ('taller_001', 'Taller Titanium', 'taller-titanium', 'agendado', '{
   ],
   "cancel_keywords": ["cancelar"],
   "help_keywords": ["ayuda"]
-}', '1092822373921606');
+}', '1092822373921606', '', '', '[]');
