@@ -21,6 +21,7 @@ import {
 } from "./factory/security";
 import { summarizeConversation } from "./factory/summarize";
 import type { CoreEnv } from "./factory/types";
+import { handleWhatsAppWebhook } from "./factory/whatsapp";
 
 export default {
   async fetch(
@@ -39,6 +40,57 @@ export default {
         console.error("Health check DB error:", e);
         return Response.json({ status: "error", db: "error" }, { status: 503 });
       }
+    }
+
+    if (url.pathname === "/webhook/whatsapp") {
+      return await handleWhatsAppWebhook(request, env, ctx);
+    }
+
+    if (url.pathname.startsWith("/app/")) {
+      const slug = url.pathname.split("/")[2];
+      const bot = await env.DB.prepare(
+        "SELECT bot_name, bot_kind, config_json FROM factory_bots WHERE slug = ?",
+      )
+        .bind(slug)
+        .first<{ bot_name: string; bot_kind: string; config_json: string }>();
+
+      if (!bot) return new Response("Not Found", { status: 404 });
+
+      const html = `<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Configuración: ${bot.bot_name}</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script type="module">
+        import { html, render } from 'https://unpkg.com/lit-html?module';
+        const root = document.getElementById('root');
+        const tg = window.Telegram.WebApp;
+        const botData = { name: "${bot.bot_name}", kind: "${bot.bot_kind}", config: ${bot.config_json} };
+
+        function App(state) {
+            return html\`
+                <div class="container">
+                    <h1>\${state.name}</h1>
+                    <p>Tipo: <strong>\${state.kind}</strong></p>
+                    <div class="field"><label>Configuración JSON</label>
+                    <textarea style="height:300px">\${JSON.stringify(state.config, null, 2)}</textarea></div>
+                    <button @click=\${() => tg.close()}>Guardar (Mock)</button>
+                </div>\`;
+        }
+        render(App(botData), root);
+        tg.ready();
+    </script>
+    <style>
+        body { font-family: sans-serif; background: var(--tg-theme-bg-color, #fff); color: var(--tg-theme-text-color, #000); padding: 20px; }
+        textarea { width: 100%; font-family: monospace; }
+        button { width: 100%; padding: 10px; background: var(--tg-theme-button-color, #3390ec); color: var(--tg-theme-button-text-color, #fff); border: none; border-radius: 8px; }
+    </style>
+</head>
+<body><div id="root"></div></body>
+</html>`;
+      return new Response(html, { headers: { "content-type": "text/html" } });
     }
 
     // --- Webhook Route (Titanium Slug-based) ---
@@ -99,7 +151,7 @@ export default {
 
       // Regular user bot: lookup by slug in factory_bots
       const botConfig = await env.DB.prepare(
-        "SELECT bot_id, token, token_iv, webhook_secret FROM factory_bots WHERE slug = ?",
+        "SELECT bot_id, token, token_iv, webhook_secret, bot_kind, config_json FROM factory_bots WHERE slug = ?",
       )
         .bind(slug)
         .first<{
