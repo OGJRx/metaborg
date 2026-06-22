@@ -82,9 +82,8 @@ describe("Worker Entry Point", () => {
       bot_id: "bot1",
       bot_name: "Bot One",
       token_var_name: "BOT1_TOKEN",
-      system_prompt: "Be a bot",
-      welcome_message: "Hi",
-      menu_json: "[]",
+      bot_kind: "open_chat",
+      config_json: "{}",
     };
 
     const request = new Request("http://localhost/api/factory/config", {
@@ -112,9 +111,8 @@ describe("Worker Entry Point", () => {
       config.bot_id,
       config.bot_name,
       config.token_var_name,
-      config.system_prompt,
-      config.welcome_message,
-      config.menu_json,
+      config.bot_kind,
+      config.config_json,
       "bot1-slug",
       "uuid-secret",
       null,

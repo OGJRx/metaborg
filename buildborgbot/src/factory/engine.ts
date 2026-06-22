@@ -4,7 +4,7 @@ import {
   createConversation,
   type VersionedState,
 } from "@grammyjs/conversations";
-import { D1Adapter } from "@grammyjs/storage-cloudflare";
+import { RelationalSessionAdapter } from "./adapter";
 import {
   Bot,
   type Context,
@@ -16,13 +16,15 @@ import type { Update } from "grammy/types";
 import { setupBotFather } from "./botfather";
 import { buildCallback, parseCallback } from "./callback";
 import { feedbackConversation } from "./conversations";
+import { handleAgendadoUpdate } from "./flows/agendado";
+import { handleToolSpecialistUpdate } from "./flows/specialist";
 import {
   handleAction,
   handleConfirmAndProcess,
   handleSummarize,
 } from "./handlers";
 import { markUpdateProcessed } from "./platform";
-import { MenuSchema } from "./schemas";
+import { AgendadoConfigSchema, MenuSchema } from "./schemas";
 import type { CoreEnv, FactoryContext, Menu, TitaniumSession } from "./types";
 
 // --- FACTORY ENGINE ---
@@ -99,16 +101,8 @@ export async function handleUpdate(
     await next();
   });
 
-  // Session storage (created fresh per request — D1Adapter is lightweight)
-  const sessionRaw = await D1Adapter.create<TitaniumSession>(
-    db,
-    "factory_sessions",
-  );
-  const sessionAdapter: StorageAdapter<TitaniumSession> = {
-    read: (key) => sessionRaw.read(key),
-    write: (key, value) => sessionRaw.write(key, value),
-    delete: (key) => sessionRaw.delete(key),
-  };
+  // Session storage (Relational Adapter for Titanium Core)
+  const sessionAdapter = new RelationalSessionAdapter(db);
 
   bot.use(
     session({
@@ -158,7 +152,19 @@ export async function handleUpdate(
   if (botId === "botfather") {
     setupBotFather(botId, bot);
   } else {
-    setupBot(botId, bot);
+    // Lookup bot_kind to decide setup
+    const botRow = await db
+      .prepare("SELECT bot_kind, config_json FROM factory_bots WHERE bot_id = ?")
+      .bind(botId)
+      .first<{ bot_kind: string; config_json: string }>();
+
+    if (botRow?.bot_kind === "agendado") {
+      setupAgendadoBot(botId, bot, botRow.config_json);
+    } else if (botRow?.bot_kind === "tool_specialist") {
+      setupSpecialistBot(botId, bot, botRow.config_json);
+    } else {
+      setupBot(botId, bot);
+    }
   }
 
   // Attach env/botId/host/waitUntil to update for conversations plugin
@@ -383,4 +389,47 @@ function setupBot(botId: string, bot: Bot<FactoryContext>) {
       // Ignore errors during reply in catch
     }
   });
+}
+
+function setupAgendadoBot(
+  botId: string,
+  bot: Bot<FactoryContext>,
+  configJson: string,
+) {
+  try {
+    const config = AgendadoConfigSchema.parse(JSON.parse(configJson));
+
+    bot.on(["message", "callback_query"], async (ctx) => {
+      await handleAgendadoUpdate(ctx, config);
+    });
+  } catch (e) {
+    console.error(`Failed to parse agendado config for bot ${botId}: ${e}`);
+  }
+
+  bot.catch(async (err) => {
+    console.error(
+      JSON.stringify({
+        level: "error",
+        tag: "GRAMMY_AGENDADO_ERROR",
+        botId: botId,
+        error: String(err),
+        timestamp: new Date().toISOString(),
+      }),
+    );
+  });
+}
+
+function setupSpecialistBot(
+  botId: string,
+  bot: Bot<FactoryContext>,
+  configJson: string,
+) {
+  try {
+    const config = JSON.parse(configJson);
+    bot.on("message:text", async (ctx) => {
+      await handleToolSpecialistUpdate(ctx, config);
+    });
+  } catch (e) {
+    console.error(`Failed to parse specialist config: ${e}`);
+  }
 }
