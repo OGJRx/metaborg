@@ -48,6 +48,19 @@ export const AgendadoConfigSchema = z.object({
     location_label: z.string().max(200).optional(),
     location_maps_url: z.string().url().optional(),
     protocol_message: z.string().max(1000).optional(),
+    cancel_message: z.string().default("❌ Operación cancelada."),
+    confirm_message: z
+      .string()
+      .default(
+        "✅ <b>¡Cita confirmada!</b>\n\nTu ticket es: <code>${ticketId}</code>",
+      ),
+    invalid_input_message: z
+      .string()
+      .default("⚠️ Entrada no válida. Reintenta."),
+    summary_header: z.string().default("<b>📋 RESUMEN DE CITA</b>"),
+    confirm_prompt: z.string().default("\n¿Desea confirmar la cita?"),
+    confirm_yes_label: z.string().default("✅ Confirmar"),
+    confirm_no_label: z.string().default("❌ Cancelar"),
   }),
   scheduling: z.object({
     capacity_per_slot: z.number().int().min(1).max(50).default(6),
@@ -107,6 +120,9 @@ export const ConfigSchema = z.object({
     .enum(["open_chat", "agendado", "tool_specialist"])
     .default("open_chat"),
   config_json: z.string(),
+  system_prompt: z.string().optional(),
+  welcome_message: z.string().optional(),
+  menu_json: z.string().optional(),
   token: z.string().optional(),
   meta_phone_number_id: z.string().optional(),
   meta_app_secret: z.string().optional(),

@@ -5,8 +5,6 @@ ALTER TABLE factory_bots ADD COLUMN bot_kind TEXT NOT NULL DEFAULT 'open_chat' C
 ALTER TABLE factory_bots ADD COLUMN config_json TEXT NOT NULL DEFAULT '{}';
 ALTER TABLE factory_bots ADD COLUMN meta_phone_number_id TEXT;
 ALTER TABLE factory_bots ADD COLUMN meta_app_secret TEXT;
-ALTER TABLE factory_bots ADD COLUMN webhook_configured_at DATETIME;
-ALTER TABLE factory_bots ADD COLUMN webhook_last_error TEXT;
 
 CREATE INDEX idx_factory_bots_kind ON factory_bots(bot_kind);
 CREATE UNIQUE INDEX idx_factory_bots_meta_phone ON factory_bots(meta_phone_number_id) WHERE meta_phone_number_id IS NOT NULL;

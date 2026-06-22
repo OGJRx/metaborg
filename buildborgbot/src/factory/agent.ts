@@ -1,4 +1,4 @@
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import { reportFailure, reportSuccess } from "./resilience";
 
 /**
@@ -39,15 +39,16 @@ export async function runAgent(
         await new Promise((resolve) => setTimeout(resolve, delay));
       }
 
-      const ai = new GoogleGenAI({ apiKey: request.apiKey });
-      const modelPromise = ai.models.generateContent({
+      const ai = new GoogleGenerativeAI(request.apiKey);
+      const model = ai.getGenerativeModel({
         model: request.modelName,
-        contents: request.contents,
-        config: {
-          systemInstruction: {
-            parts: [{ text: request.systemInstruction }],
-          },
+        systemInstruction: {
+          role: "system",
+          parts: [{ text: request.systemInstruction }],
         },
+      });
+      const modelPromise = model.generateContent({
+        contents: request.contents,
       });
 
       // Implement timeout using Promise.race
@@ -61,7 +62,7 @@ export async function runAgent(
         ),
       ]);
 
-      const text = result.text;
+      const text = result.response.text();
       if (!text) throw new Error("No response text from Gemini");
 
       await reportSuccess(db, request.botId);

@@ -21,7 +21,57 @@ import {
 } from "./factory/security";
 import { summarizeConversation } from "./factory/summarize";
 import type { CoreEnv } from "./factory/types";
-import { handleWhatsAppWebhook } from "./factory/whatsapp";
+import { handleWhatsAppWebhook } from "./factory/whatsapp/dispatcher";
+import { getMiniAppHTML } from "./miniapp/app";
+
+async function validateTelegramInitData(
+  initData: string,
+  botToken: string,
+): Promise<boolean> {
+  const params = new URLSearchParams(initData);
+  const hash = params.get("hash");
+  if (!hash) return false;
+
+  params.delete("hash");
+  const sortedKeys = Array.from(params.keys()).sort();
+  const dataCheckString = sortedKeys
+    .map((key) => `${key}=${params.get(key)}`)
+    .join("\n");
+
+  const encoder = new TextEncoder();
+  const secretKey = await crypto.subtle.importKey(
+    "raw",
+    encoder.encode("WebAppData"),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  const baseKey = await crypto.subtle.sign(
+    "HMAC",
+    secretKey,
+    encoder.encode(botToken),
+  );
+
+  const signatureKey = await crypto.subtle.importKey(
+    "raw",
+    baseKey,
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  const signature = await crypto.subtle.sign(
+    "HMAC",
+    signatureKey,
+    encoder.encode(dataCheckString),
+  );
+
+  const hashArray = Array.from(new Uint8Array(signature));
+  const hexHash = hashArray
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+
+  return hexHash === hash;
+}
 
 export default {
   async fetch(
@@ -56,41 +106,53 @@ export default {
 
       if (!bot) return new Response("Not Found", { status: 404 });
 
-      const html = `<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Configuración: ${bot.bot_name}</title>
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <script type="module">
-        import { html, render } from 'https://unpkg.com/lit-html?module';
-        const root = document.getElementById('root');
-        const tg = window.Telegram.WebApp;
-        const botData = { name: "${bot.bot_name}", kind: "${bot.bot_kind}", config: ${bot.config_json} };
+      return new Response(
+        getMiniAppHTML(bot.bot_name, bot.bot_kind, bot.config_json),
+        { headers: { "content-type": "text/html" } },
+      );
+    }
 
-        function App(state) {
-            return html\`
-                <div class="container">
-                    <h1>\${state.name}</h1>
-                    <p>Tipo: <strong>\${state.kind}</strong></p>
-                    <div class="field"><label>Configuración JSON</label>
-                    <textarea style="height:300px">\${JSON.stringify(state.config, null, 2)}</textarea></div>
-                    <button @click=\${() => tg.close()}>Guardar (Mock)</button>
-                </div>\`;
-        }
-        render(App(botData), root);
-        tg.ready();
-    </script>
-    <style>
-        body { font-family: sans-serif; background: var(--tg-theme-bg-color, #fff); color: var(--tg-theme-text-color, #000); padding: 20px; }
-        textarea { width: 100%; font-family: monospace; }
-        button { width: 100%; padding: 10px; background: var(--tg-theme-button-color, #3390ec); color: var(--tg-theme-button-text-color, #fff); border: none; border-radius: 8px; }
-    </style>
-</head>
-<body><div id="root"></div></body>
-</html>`;
-      return new Response(html, { headers: { "content-type": "text/html" } });
+    if (url.pathname === "/api/miniapp/config" && request.method === "POST") {
+      const initData = request.headers.get("X-Telegram-Init-Data");
+      if (!initData) return new Response("Missing initData", { status: 401 });
+
+      // Basic parsing of initData to find user/bot
+      const params = new URLSearchParams(initData);
+      const userJson = params.get("user");
+      if (!userJson)
+        return new Response("Invalid user in initData", { status: 401 });
+
+      // In a real multi-tenant scenario, we'd find the bot associated with this user
+      // For now, we assume the user is authorized for the bot they are accessing
+      // Authentication should ideally use a bot token. Since we don't know WHICH bot token to use yet without lookup
+      // we'll use TITANIUM_API_SECRET as a fallback signature key if needed, but Telegram requires the BOT TOKEN.
+
+      // Let's assume the client sends the slug or we derive it
+      // POST /api/miniapp/config?slug=xxx
+      const slug = url.searchParams.get("slug");
+      if (!slug) return new Response("Missing slug", { status: 400 });
+
+      const bot = await env.DB.prepare(
+        "SELECT token, token_iv FROM factory_bots WHERE slug = ?",
+      )
+        .bind(slug)
+        .first<{ token: string; token_iv: string }>();
+      if (!bot) return new Response("Bot not found", { status: 404 });
+
+      const key = await deriveKey(env.TITANIUM_API_SECRET);
+      const plainToken = await decrypt(bot.token, bot.token_iv, key);
+
+      const isValid = await validateTelegramInitData(initData, plainToken);
+      if (!isValid) return new Response("Invalid signature", { status: 403 });
+
+      const newConfig = await request.json();
+      await env.DB.prepare(
+        "UPDATE factory_bots SET config_json = ? WHERE slug = ?",
+      )
+        .bind(JSON.stringify(newConfig), slug)
+        .run();
+
+      return Response.json({ success: true });
     }
 
     // --- Webhook Route (Titanium Slug-based) ---
@@ -286,7 +348,12 @@ export default {
       const result = await upsertBotConfig(
         env.DB,
         env,
-        validated,
+        {
+          ...validated,
+          system_prompt: validated.system_prompt ?? "",
+          welcome_message: validated.welcome_message ?? "",
+          menu_json: validated.menu_json ?? "[]",
+        },
         request.headers.get("host") || "unknown",
       );
 

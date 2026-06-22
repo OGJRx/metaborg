@@ -4,7 +4,7 @@ import {
   createConversation,
   type VersionedState,
 } from "@grammyjs/conversations";
-import { RelationalSessionAdapter } from "./adapter";
+import { D1Adapter } from "@grammyjs/storage-cloudflare";
 import {
   Bot,
   type Context,
@@ -13,6 +13,7 @@ import {
   session,
 } from "grammy";
 import type { Update } from "grammy/types";
+import { RelationalSessionAdapter } from "./adapter";
 import { setupBotFather } from "./botfather";
 import { buildCallback, parseCallback } from "./callback";
 import { feedbackConversation } from "./conversations";
@@ -25,7 +26,7 @@ import {
 } from "./handlers";
 import { markUpdateProcessed } from "./platform";
 import { AgendadoConfigSchema, MenuSchema } from "./schemas";
-import type { CoreEnv, FactoryContext, Menu, TitaniumSession } from "./types";
+import type { CoreEnv, FactoryContext, Menu } from "./types";
 
 // --- FACTORY ENGINE ---
 
@@ -125,10 +126,10 @@ export async function handleUpdate(
     await next();
   });
 
-  // Conversation storage (created fresh per request)
+  // Conversation storage (using dedicated factory_conversations table)
   const convoRaw = await D1Adapter.create<VersionedState<ConversationData>>(
     db,
-    "factory_sessions",
+    "factory_conversations",
   );
   const convoAdapter: StorageAdapter<VersionedState<ConversationData>> = {
     read: (key) => convoRaw.read(key),
@@ -154,7 +155,9 @@ export async function handleUpdate(
   } else {
     // Lookup bot_kind to decide setup
     const botRow = await db
-      .prepare("SELECT bot_kind, config_json FROM factory_bots WHERE bot_id = ?")
+      .prepare(
+        "SELECT bot_kind, config_json FROM factory_bots WHERE bot_id = ?",
+      )
       .bind(botId)
       .first<{ bot_kind: string; config_json: string }>();
 
@@ -420,7 +423,7 @@ function setupAgendadoBot(
 }
 
 function setupSpecialistBot(
-  botId: string,
+  _botId: string,
   bot: Bot<FactoryContext>,
   configJson: string,
 ) {

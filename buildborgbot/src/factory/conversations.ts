@@ -76,6 +76,12 @@ export async function newBotConversation(
           system_prompt: systemPrompt,
           welcome_message: `¡Hola! Soy ${botName}. ¿En qué puedo ayudarte?`,
           menu_json: "[]",
+          bot_kind: "open_chat",
+          config_json: JSON.stringify({
+            system_prompt: systemPrompt,
+            welcome_message: `¡Hola! Soy ${botName}. ¿En qué puedo ayudarte?`,
+            menu_json: "[]",
+          }),
         },
         promptCtx.host,
       ),

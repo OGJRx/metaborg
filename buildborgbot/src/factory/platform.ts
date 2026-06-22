@@ -77,6 +77,8 @@ export async function upsertBotConfig(
     system_prompt: string;
     welcome_message: string;
     menu_json: string;
+    bot_kind: "open_chat" | "agendado" | "tool_specialist";
+    config_json: string;
     token?: string | undefined;
   },
   host: string,

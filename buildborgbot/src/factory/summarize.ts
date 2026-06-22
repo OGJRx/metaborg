@@ -1,4 +1,4 @@
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
 export async function summarizeConversation(
   db: D1Database,
@@ -25,9 +25,9 @@ export async function summarizeConversation(
       )
       .join("\n\n");
 
-    const ai = new GoogleGenAI({ apiKey: env.GEMINI_API_KEY });
-    const resultPromise = ai.models.generateContent({
-      model: env.AI_MODEL_NAME,
+    const ai = new GoogleGenerativeAI(env.GEMINI_API_KEY);
+    const model = ai.getGenerativeModel({ model: env.AI_MODEL_NAME });
+    const resultPromise = model.generateContent({
       contents: [
         {
           role: "user",
@@ -40,7 +40,7 @@ export async function summarizeConversation(
       ],
     });
     const result = await resultPromise;
-    summary = result.text ?? "";
+    summary = result.response.text() ?? "";
   }
 
   if (!summary) throw new Error("Failed to generate summary");
