@@ -49,7 +49,11 @@ export type FactoryContext = Context &
     env: CoreEnv;
     botId: string;
     host: string;
+    platform: "telegram" | "whatsapp";
     waitUntil: (promise: Promise<unknown>) => void;
+    replyInteractiveButtons?: (body: string, buttons: { id: string; title: string }[]) => Promise<unknown>;
+    replyInteractiveList?: (body: string, button: string, sections: { title: string; rows: { id: string; title: string; description?: string }[] }[]) => Promise<unknown>;
+    hasCommand?: (cmd: string) => boolean;
   };
 
 export type Menu = z.infer<typeof MenuSchema>;

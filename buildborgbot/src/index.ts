@@ -22,6 +22,7 @@ import {
 import { summarizeConversation } from "./factory/summarize";
 import type { CoreEnv } from "./factory/types";
 import { handleWhatsAppWebhook } from "./factory/whatsapp/dispatcher";
+import { AgendadoConfigSchema } from "./factory/schemas";
 import { getMiniAppHTML } from "./miniapp/app";
 
 async function validateTelegramInitData(
@@ -116,27 +117,19 @@ export default {
       const initData = request.headers.get("X-Telegram-Init-Data");
       if (!initData) return new Response("Missing initData", { status: 401 });
 
-      // Basic parsing of initData to find user/bot
       const params = new URLSearchParams(initData);
       const userJson = params.get("user");
       if (!userJson)
         return new Response("Invalid user in initData", { status: 401 });
 
-      // In a real multi-tenant scenario, we'd find the bot associated with this user
-      // For now, we assume the user is authorized for the bot they are accessing
-      // Authentication should ideally use a bot token. Since we don't know WHICH bot token to use yet without lookup
-      // we'll use TITANIUM_API_SECRET as a fallback signature key if needed, but Telegram requires the BOT TOKEN.
-
-      // Let's assume the client sends the slug or we derive it
-      // POST /api/miniapp/config?slug=xxx
       const slug = url.searchParams.get("slug");
       if (!slug) return new Response("Missing slug", { status: 400 });
 
       const bot = await env.DB.prepare(
-        "SELECT token, token_iv FROM factory_bots WHERE slug = ?",
+        "SELECT token, token_iv, bot_kind FROM factory_bots WHERE slug = ?",
       )
         .bind(slug)
-        .first<{ token: string; token_iv: string }>();
+        .first<{ token: string; token_iv: string; bot_kind: string }>();
       if (!bot) return new Response("Bot not found", { status: 404 });
 
       const key = await deriveKey(env.TITANIUM_API_SECRET);
@@ -145,9 +138,24 @@ export default {
       const isValid = await validateTelegramInitData(initData, plainToken);
       if (!isValid) return new Response("Invalid signature", { status: 403 });
 
-      const newConfig = await request.json();
+      const newConfig = (await request.json()) as any;
+
+      // Validation logic: Ensure the config matches the bot_kind
+      try {
+        if (bot.bot_kind === "agendado") {
+          AgendadoConfigSchema.parse(newConfig);
+        } else if (bot.bot_kind === "tool_specialist") {
+          // ToolSpecialistConfigSchema if applicable
+        }
+      } catch (e) {
+        return Response.json(
+          { error: "Invalid configuration for bot_kind", details: e },
+          { status: 400 },
+        );
+      }
+
       await env.DB.prepare(
-        "UPDATE factory_bots SET config_json = ? WHERE slug = ?",
+        "UPDATE factory_bots SET config_json = ?, updated_at = CURRENT_TIMESTAMP WHERE slug = ?",
       )
         .bind(JSON.stringify(newConfig), slug)
         .run();

@@ -98,6 +98,7 @@ export async function handleUpdate(
     ctx.env = currentEnv;
     ctx.botId = currentBotId;
     ctx.host = currentHost;
+    ctx.platform = "telegram";
     ctx.waitUntil = currentWaitUntil;
     await next();
   });

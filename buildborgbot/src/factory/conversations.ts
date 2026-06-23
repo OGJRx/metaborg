@@ -5,16 +5,37 @@ import type { FactoryContext } from "./types";
 
 type Convo = Conversation<FactoryContext, FactoryContext>;
 
+import { InlineKeyboard } from "grammy";
+
 export async function newBotConversation(
   conversation: Convo,
   ctx: FactoryContext,
 ): Promise<void> {
   await ctx.reply(
-    "🆕 <b>NUEVO BOT BORG</b>\n\nIngresa el ID único del bot (slug):",
+    "🆕 <b>NUEVO BOT BORG</b>\n\nSelecciona el tipo de bot que deseas crear:",
     {
       parse_mode: "HTML",
+      reply_markup: new InlineKeyboard()
+        .text("💬 Chat Abierto (IA)", "kind:open_chat")
+        .row()
+        .text("📅 Agendado Genérico", "kind:agendado")
+        .row()
+        .text("🛠️ Especialista (OBD/Partes)", "kind:tool_specialist"),
     },
   );
+
+  const kindCtx = await conversation.waitForCallbackQuery(/^kind:/, {
+    maxMilliseconds: 5 * 60 * 1000,
+  });
+  const botKind = kindCtx.match[0].split(":")[1] as
+    | "open_chat"
+    | "agendado"
+    | "tool_specialist";
+  await kindCtx.answerCallbackQuery();
+
+  await kindCtx.reply("🆔 Ingresa el ID único del bot (slug):", {
+    parse_mode: "HTML",
+  });
   const botIdCtx = await conversation.waitFor("message:text", {
     maxMilliseconds: 5 * 60 * 1000,
   });
@@ -50,22 +71,25 @@ export async function newBotConversation(
   });
   const botToken = tokenCtx.message.text;
 
-  await tokenCtx.reply("📜 Ingresa el System Prompt (instrucciones de IA):", {
-    parse_mode: "HTML",
-  });
-  const promptCtx = await conversation.waitFor("message:text", {
-    maxMilliseconds: 5 * 60 * 1000,
-  });
-  const systemPrompt = promptCtx.message.text;
+  let systemPrompt = "";
+  if (botKind !== "agendado") {
+    await tokenCtx.reply("📜 Ingresa el System Prompt (instrucciones de IA):", {
+      parse_mode: "HTML",
+    });
+    const promptCtx = await conversation.waitFor("message:text", {
+      maxMilliseconds: 5 * 60 * 1000,
+    });
+    systemPrompt = promptCtx.message.text;
+  }
 
-  await promptCtx.reply("⏳ Procesando creación...");
+  await tokenCtx.reply("⏳ Procesando creación...");
 
   try {
-    assertEnv(promptCtx);
+    assertEnv(tokenCtx);
     const result = await conversation.external(() =>
       upsertBotConfig(
-        promptCtx.env.DB,
-        promptCtx.env,
+        tokenCtx.env.DB,
+        tokenCtx.env,
         {
           bot_id: botId,
           bot_name: botName,
@@ -76,27 +100,38 @@ export async function newBotConversation(
           system_prompt: systemPrompt,
           welcome_message: `¡Hola! Soy ${botName}. ¿En qué puedo ayudarte?`,
           menu_json: "[]",
-          bot_kind: "open_chat",
-          config_json: JSON.stringify({
-            system_prompt: systemPrompt,
-            welcome_message: `¡Hola! Soy ${botName}. ¿En qué puedo ayudarte?`,
-            menu_json: "[]",
-          }),
+          bot_kind: botKind,
+          config_json:
+            botKind === "agendado"
+              ? "{}"
+              : JSON.stringify({
+                  system_prompt: systemPrompt,
+                  welcome_message: `¡Hola! Soy ${botName}. ¿En qué puedo ayudarte?`,
+                  menu_json: "[]",
+                }),
         },
-        promptCtx.host,
+        tokenCtx.host,
       ),
     );
 
     if (result.success) {
       if (result.webhook_ok) {
-        await promptCtx.reply(
-          `✅ <b>BOT CREADO</b>\n\nID: <code>${botId}</code>\nURL Webhook: <code>/webhook/${botId}</code>`,
-          {
-            parse_mode: "HTML",
-          },
-        );
+        let msg = `✅ <b>BOT CREADO</b>\n\nID: <code>${botId}</code>\nURL Webhook: <code>/webhook/${botId}</code>`;
+        let keyboard: InlineKeyboard | undefined;
+
+        if (botKind === "agendado") {
+          msg +=
+            "\n\n⚙️ <b>CONFIGURACIÓN PENDIENTE:</b> Este bot de agendado requiere personalización (steps, horarios, etc). Usa el botón de abajo para abrir el editor visual.";
+          const webAppUrl = `https://${tokenCtx.host}/app/${botId}`;
+          keyboard = new InlineKeyboard().webApp("🛠️ Abrir Editor", webAppUrl);
+        }
+
+        await tokenCtx.reply(msg, {
+          parse_mode: "HTML",
+          reply_markup: keyboard as any,
+        });
       } else {
-        await promptCtx.reply(
+        await tokenCtx.reply(
           `⚠️ <b>BOT CREADO CON ADVERTENCIA</b>\n\nID: <code>${botId}</code>\n\nEl bot se registró correctamente pero el <b>webhook NO pudo configurarse</b>.\n\nError: <code>${result.webhook_error}</code>\n\nEl bot no recibirá mensajes hasta que se resuelva este problema. Puedes intentar actualizarlo nuevamente más tarde.`,
           {
             parse_mode: "HTML",
@@ -104,7 +139,7 @@ export async function newBotConversation(
         );
       }
     } else {
-      await promptCtx.reply(
+      await tokenCtx.reply(
         `❌ Error al crear bot: ${result.error ?? "Unknown error"}`,
       );
     }
@@ -118,7 +153,7 @@ export async function newBotConversation(
         timestamp: new Date().toISOString(),
       }),
     );
-    await promptCtx.reply(`❌ Error crítico: ${String(err)}`);
+    await tokenCtx.reply(`❌ Error crítico: ${String(err)}`);
   }
 }
 
