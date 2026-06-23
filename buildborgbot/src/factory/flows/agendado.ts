@@ -1,15 +1,19 @@
-import { InlineKeyboard } from "grammy";
 import type { z } from "zod";
 import type { AgendadoConfigSchema, StepSchema } from "../schemas";
 import type { FactoryContext } from "../types";
+import { getRenderAdapter, RenderAdapter } from "./render-adapter";
+import { SlotValidator, createTicketAtomic } from "./scheduling-logic";
+import type { TitaniumSession } from "../types";
 
 type AgendadoConfig = z.infer<typeof AgendadoConfigSchema>;
+type Step = z.infer<typeof StepSchema>;
 
 export async function handleAgendadoUpdate(
   ctx: FactoryContext,
   config: AgendadoConfig,
 ) {
   const session = ctx.session;
+  const adapter = getRenderAdapter(ctx.platform);
 
   if (!session.step_data) session.step_data = {};
   if (session.paso_actual === undefined) session.paso_actual = 0;
@@ -17,203 +21,232 @@ export async function handleAgendadoUpdate(
   const text = ctx.message?.text;
   const callbackData = ctx.callbackQuery?.data;
 
-  // Handle help/cancel keywords
+  // Keywords handling
   if (text) {
-    if (config.cancel_keywords.includes(text.toLowerCase())) {
-      session.paso_actual = -1; // Cancelled state
-      return await ctx.reply(config.business_identity.cancel_message);
+    const cleanText = text.toLowerCase().trim();
+    if (config.cancel_keywords.includes(cleanText)) {
+      session["paso_actual"] = -1;
+      session["estado_flujo"] = "cancelado";
+      return await adapter.renderCancellation({ ctx, config, text: "", options: undefined });
     }
-    if (config.help_keywords.includes(text.toLowerCase())) {
-      session.paso_actual = 0;
+    if (config.help_keywords.includes(cleanText)) {
+      session["paso_actual"] = 0;
       session.step_data = {};
+      session["estado_flujo"] = "iniciado";
     }
   }
 
   // Handle Start
-  const firstStep = config.steps[0];
-  if (
-    ctx.hasCommand("start") ||
-    (session.paso_actual === 0 &&
-      !callbackData &&
-      (!firstStep || !session.step_data[firstStep.id]))
-  ) {
-    session.paso_actual = 0;
+  if (ctx.hasCommand("start") || (session.paso_actual === 0 && !callbackData && Object.keys(session.step_data || {}).length === 0)) {
+    session["paso_actual"] = 0;
     session.step_data = {};
-    await ctx.reply(config.business_identity.welcome_message, {
-      parse_mode: "HTML",
-    });
-    return await renderStep(ctx, config, 0);
+    session["estado_flujo"] = "iniciado";
+    // We don't await welcome message here to avoid double send if renderStep also sends something
+    // but the original logic had it.
+    await ctx.reply(config.business_identity.welcome_message, { parse_mode: "HTML" });
+    return await renderCurrentStep(ctx, config, session, adapter);
   }
 
-  if (session.paso_actual === -1) return; // Silent ignore if cancelled until start
-
-  // Handle Confirmation Callbacks
-  if (callbackData === "conf_yes") {
-    const ticketId = `T-${ctx.botId.slice(0, 4)}-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
-    await ctx.env.DB.prepare(
-      "INSERT INTO factory_tickets (ticket_id, bot_id, session_id, platform, chat_id, step_data) VALUES (?, ?, ?, ?, ?, ?)",
-    )
-      .bind(
-        ticketId,
-        ctx.botId,
-        `S-${ctx.chat?.id}-${Date.now()}`,
-        "telegram",
-        ctx.chat?.id.toString(),
-        JSON.stringify(session.step_data),
-      )
-      .run();
-
-    await ctx.env.DB.prepare(
-      "UPDATE factory_sessions SET estado_flujo = 'confirmado' WHERE bot_id = ? AND chat_id = ? AND estado_flujo = 'activo'",
-    )
-      .bind(ctx.botId, ctx.chat?.id.toString())
-      .run();
-
-    const msg = config.business_identity.confirm_message.replace(
-      "${ticketId}",
-      ticketId,
-    );
-    return await ctx.reply(msg, { parse_mode: "HTML" });
-  }
-
-  if (callbackData === "conf_no") {
-    await ctx.env.DB.prepare(
-      "UPDATE factory_sessions SET estado_flujo = 'cancelado' WHERE bot_id = ? AND chat_id = ? AND estado_flujo = 'activo'",
-    )
-      .bind(ctx.botId, ctx.chat?.id.toString())
-      .run();
-    return await ctx.reply(config.business_identity.cancel_message);
-  }
-
-  // Handle Callback or Text Input
-  const currentStep = config.steps[session.paso_actual];
-  if (!currentStep) return;
-
-  let value: string | undefined;
-  if (callbackData?.startsWith("step:")) {
-    const parts = callbackData.split(":");
-    if (parts[1] === currentStep.id) {
-      // Validate callback value against options if select/multi_select
-      if (
-        currentStep.type === "select" ||
-        currentStep.type === "multi_select"
-      ) {
-        const optMatch = currentStep.options?.find((o) => o.value === parts[2]);
-        if (optMatch) value = parts[2];
-      } else {
-        value = parts[2];
+  if (session["estado_flujo"] === "confirmado" || session["estado_flujo"] === "cancelado") {
+      if (ctx.hasCommand("start")) {
+          session["paso_actual"] = 0;
+          session.step_data = {};
+          session["estado_flujo"] = "iniciado";
+          return await renderCurrentStep(ctx, config, session, adapter);
       }
+      return;
+  }
+
+  // Handle Callbacks
+  if (callbackData) {
+    if (callbackData === "conf_yes") {
+        return await handleConfirmation(ctx, config, session, adapter, ctx.platform);
     }
-  } else if (text) {
-    if (["text", "number"].includes(currentStep.type)) {
-      value = text;
+    if (callbackData === "conf_no") {
+        session["estado_flujo"] = "cancelado";
+        return await adapter.renderCancellation({ ctx, config, text: "", options: undefined });
+    }
+    if (callbackData.startsWith("step:")) {
+        const parts = callbackData.split(":");
+        const stepId = parts[1];
+        const value = parts.slice(2).join(":");
+        if (stepId === config.steps[session.paso_actual]?.id) {
+            return await processStepInput(ctx, config, session, adapter, value);
+        }
     }
   }
 
-  if (value) {
-    const isValid = validateInput(currentStep, value);
-    if (!isValid) {
-      return await ctx.reply(
-        currentStep.error_message ||
-          config.business_identity.invalid_input_message,
-      );
-    }
+  // Handle Text/Numeric Input (including WhatsApp numeric selection)
+  if (text) {
+      const currentStep = config.steps[session.paso_actual];
+      if (!currentStep) return;
 
-    session.step_data[currentStep.id] = value;
-    session.paso_actual++;
+      // Check for summary confirmation shortcuts (1 for Yes, 2 for No in WhatsApp)
+      if ((session.paso_actual || 0) >= config.steps.length) {
+          if (text.trim() === "1") return await handleConfirmation(ctx, config, session, adapter, ctx.platform);
+          if (text.trim() === "2") {
+              session["estado_flujo"] = "cancelado";
+              return await adapter.renderCancellation({ ctx, config, text: "", options: undefined });
+          }
+      }
 
-    if (session.paso_actual >= config.steps.length) {
-      return await renderSummary(ctx, config, session.step_data);
-    } else {
-      return await renderStep(ctx, config, session.paso_actual);
-    }
+      // Numeric selection for select/multi_select
+      if (currentStep.type === "select" || currentStep.type === "date" || currentStep.type === "time") {
+          const selection = parseInt(text.trim(), 10);
+          if (!isNaN(selection)) {
+              const options = await getStepOptions(ctx, config, currentStep);
+              if (options && selection > 0 && selection <= options.length) {
+                  const opt = options[selection - 1];
+                  if (opt) return await processStepInput(ctx, config, session, adapter, opt.value as string);
+              }
+          }
+      }
+
+      // Normal text/number input
+      return await processStepInput(ctx, config, session, adapter, text.trim());
   }
 }
 
-function validateInput(
-  step: z.infer<typeof StepSchema>,
+async function processStepInput(
+  ctx: FactoryContext,
+  config: AgendadoConfig,
+  session: TitaniumSession,
+  adapter: RenderAdapter,
   value: string,
-): boolean {
-  if (step.type === "number") {
-    const n = Number(value);
-    if (Number.isNaN(n)) return false;
-    if (step.validation?.min !== undefined && n < step.validation.min)
-      return false;
-    if (step.validation?.max !== undefined && n > step.validation.max)
-      return false;
-  }
-  if (step.type === "text" && step.validation?.pattern) {
-    const regex = new RegExp(step.validation.pattern);
-    if (!regex.test(value)) return false;
-  }
-  return true;
+) {
+    const idx = session.paso_actual ?? 0;
+    const currentStep = config.steps[idx];
+    if (!currentStep) return;
+
+    if (!validateInput(currentStep, value)) {
+        return await ctx.reply(currentStep.error_message || config.business_identity.invalid_input_message);
+    }
+
+    if (!session.step_data) session.step_data = {};
+    session.step_data[currentStep.id] = value;
+    session["paso_actual"] = (session.paso_actual || 0) + 1;
+
+    if ((session.paso_actual || 0) >= config.steps.length) {
+        return await adapter.renderSummary({ ctx, config, data: session.step_data || {}, text: "", options: undefined });
+    } else {
+        return await renderCurrentStep(ctx, config, session, adapter);
+    }
 }
 
-async function renderStep(
+async function handleConfirmation(
   ctx: FactoryContext,
   config: AgendadoConfig,
-  index: number,
+  session: TitaniumSession,
+  adapter: RenderAdapter,
+  platform: "telegram" | "whatsapp",
 ) {
-  const step = config.steps[index];
-  if (!step) return;
+    const dateStepId = config.appointment_mapping?.date_step_id;
+    const timeStepId = config.appointment_mapping?.time_step_id;
+    const fechaCita = (dateStepId && session.step_data) ? session.step_data[dateStepId] : null;
+    const horaCita = (timeStepId && session.step_data) ? session.step_data[timeStepId] : null;
 
-  const keyboard = new InlineKeyboard();
-  if (
-    (step.type === "select" || step.type === "multi_select") &&
-    step.options
-  ) {
-    step.options.forEach((opt, i) => {
-      keyboard.text(opt.label, `step:${step.id}:${opt.value}`);
-      if (i % 2 === 1) keyboard.row();
+    const res = await createTicketAtomic(ctx.env.DB, {
+        botId: ctx.botId,
+        sessionId: `S-${ctx.chat?.id}-${Date.now()}`,
+        platform,
+        chatId: ctx.chat?.id.toString() || "unknown",
+        stepData: JSON.stringify(session.step_data || {}),
+        fechaCita: fechaCita || "",
+        horaCita: horaCita || "",
+        capacity: config.scheduling.capacity_per_slot
     });
-  } else if (step.type === "date") {
-    const today = new Date();
-    const horizon = config.scheduling.booking_horizon_days;
-    for (let i = 1; i <= horizon; i++) {
-      const d = new Date(today);
-      d.setDate(today.getDate() + i);
-      const iso = d.toISOString().split("T")[0];
-      if (iso) {
-        keyboard.text(iso, `step:${step.id}:${iso}`);
-        if (i % 3 === 0) keyboard.row();
-      }
-    }
-  } else if (step.type === "time") {
-    const { open_hour, close_hour } = config.office_hours;
-    for (let h = open_hour; h < close_hour; h++) {
-      const time = `${h.toString().padStart(2, "0")}:00`;
-      keyboard.text(time, `step:${step.id}:${time}`);
-      if ((h - open_hour + 1) % 4 === 0) keyboard.row();
-    }
-  }
 
-  const replyMarkup =
-    keyboard.inline_keyboard.length > 0 ? keyboard : undefined;
-  await ctx.reply(step.prompt, {
-    parse_mode: "HTML",
-    ...(replyMarkup ? { reply_markup: replyMarkup } : {}),
-  });
+    if (!res.success) {
+        // Find the step index for date or time to go back
+        if (timeStepId) {
+            const idx = config.steps.findIndex(s => s.id === timeStepId);
+            if (idx !== -1) session["paso_actual"] = idx;
+        }
+        return await ctx.reply("❌ Lo sentimos, el horario seleccionado ya no está disponible. Por favor elige otro.");
+    }
+
+    session["estado_flujo"] = "confirmado";
+
+    // Notify Admin (Simple implementation for now)
+    try {
+        const adminMsg = `🆕 <b>NUEVA CITA CONFIRMADA</b>\n\nBot: ${config.business_identity.name}\nTicket: <code>${res.ticketId}</code>\nPlataforma: ${platform}\nUsuario: ${ctx.chat?.id}\n\n<b>Detalles:</b>\n${Object.entries(session.step_data || {}).map(([k, v]) => `• ${k}: ${v}`).join("\n")}`;
+        // In a real scenario, we'd lookup admin IDs from factory_platform_config
+        console.log("Admin Notification:", adminMsg);
+    } catch (e) {
+        console.error("Failed to send admin notification:", e);
+    }
+
+    return await adapter.renderConfirmation({ ctx, config, ticketId: res.ticketId || "ERR", text: "", options: undefined });
 }
 
-async function renderSummary(
+async function renderCurrentStep(
   ctx: FactoryContext,
   config: AgendadoConfig,
-  data: Record<string, string>,
+  session: TitaniumSession,
+  adapter: RenderAdapter,
 ) {
-  let summary = `${config.business_identity.summary_header}\n\n`;
-  config.steps.forEach((step) => {
-    const val = data[step.id];
-    summary += `<b>${step.label}:</b> ${val}\n`;
-  });
+    const step = config.steps[session.paso_actual || 0];
+    if (!step) return;
 
-  summary += config.business_identity.confirm_prompt;
+    const options = await getStepOptions(ctx, config, step);
+    return await adapter.renderPrompt({
+        ctx,
+        config,
+        step,
+        options: options ? options.map(o => ({ label: o.label || "", value: o.value || "" })) : undefined,
+        text: step.prompt
+    });
+}
 
-  const keyboard = new InlineKeyboard()
-    .text(config.business_identity.confirm_yes_label, "conf_yes")
-    .text(config.business_identity.confirm_no_label, "conf_no");
+async function getStepOptions(ctx: FactoryContext, config: AgendadoConfig, step: Step) {
+    if (step.options) return step.options;
 
-  await ctx.reply(summary, {
-    parse_mode: "HTML",
-    reply_markup: keyboard,
-  });
+    if (step.type === "date") {
+        const horizon = config.scheduling.booking_horizon_days;
+        const options = [];
+        const today = new Date(); // Ideally getVenezuelaNow()
+        for (let i = 1; i <= horizon; i++) {
+            const d = new Date(today);
+            d.setDate(today.getDate() + i);
+            const iso = d.toISOString().split("T")[0];
+            const dayOfWeek = d.getDay();
+            if (config.office_hours.work_days[dayOfWeek]) {
+                options.push({ label: iso, value: iso });
+            }
+            if (options.length >= 10) break; // WhatsApp limit
+        }
+        return options;
+    }
+
+    if (step.type === "time") {
+        const dateStepId = config.appointment_mapping?.date_step_id;
+        const fecha = dateStepId ? ctx.session.step_data?.[dateStepId] : null;
+        if (!fecha) return [];
+
+        const validator = new SlotValidator(ctx.env.DB);
+        const slots = await validator.getAvailableSlots(ctx.botId, fecha, {
+            capacity: config.scheduling.capacity_per_slot,
+            duration: config.scheduling.slot_duration_minutes,
+            openHour: config.office_hours.open_hour,
+            closeHour: config.office_hours.close_hour,
+            workDays: config.office_hours.work_days,
+            bufferMinutes: config.scheduling.buffer_arrival_minutes,
+            timezone: config.office_hours.timezone
+        });
+
+        return slots.filter(s => s.available).map(s => ({ label: s.hora, value: s.hora }));
+    }
+
+    return undefined;
+}
+
+function validateInput(step: Step, value: string): boolean {
+    if (step.type === "number") {
+        const n = Number(value);
+        if (Number.isNaN(n)) return false;
+        if (step.validation?.min !== undefined && n < step.validation.min) return false;
+        if (step.validation?.max !== undefined && n > step.validation.max) return false;
+    }
+    // Add more validations from step.validation if needed
+    return true;
 }
