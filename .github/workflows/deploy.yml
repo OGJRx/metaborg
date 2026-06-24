@@ -153,6 +153,7 @@ jobs:
         uses: cloudflare/wrangler-action@v3
         with:
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           command: d1 migrations apply bot_factory_db --remote
           workingDirectory: buildborgbot
 
@@ -160,6 +161,7 @@ jobs:
         uses: cloudflare/wrangler-action@v3
         with:
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           command: deploy
           workingDirectory: buildborgbot
 
