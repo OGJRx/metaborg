@@ -108,6 +108,8 @@ jobs:
           if [ -n "${{ secrets.ADMIN_TELEGRAM_IDS }}" ]; then
             echo "${{ secrets.ADMIN_TELEGRAM_IDS }}" | npx wrangler secret put ADMIN_TELEGRAM_IDS
           fi
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
 
       - name: 🗄️ Apply D1 Migrations
         uses: cloudflare/wrangler-action@v3
