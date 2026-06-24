@@ -82,7 +82,7 @@ describe("Worker Entry Point", () => {
       bot_id: "bot1",
       bot_name: "Bot One",
       token_var_name: "BOT1_TOKEN",
-      bot_kind: "open_chat",
+      bot_kind: "open_chat" as const,
       config_json: "{}",
     };
 
@@ -115,6 +115,8 @@ describe("Worker Entry Point", () => {
       config.config_json,
       "bot1-slug",
       "uuid-secret",
+      null,
+      null,
       null,
       null,
     );
