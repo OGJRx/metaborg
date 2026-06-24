@@ -1,29 +1,20 @@
 import {
   type ConversationData,
   conversations,
-  createConversation,
   type VersionedState,
 } from "@grammyjs/conversations";
 import { D1Adapter } from "@grammyjs/storage-cloudflare";
-import {
-  Bot,
-  type Context,
-  InlineKeyboard,
-  type StorageAdapter,
-  session,
-} from "grammy";
+import { Bot, type Context, type StorageAdapter, session } from "grammy";
 import type { Update } from "grammy/types";
 import { RelationalSessionAdapter } from "./adapter";
 import { setupBotFather } from "./botfather";
-import {
-  BotKindSetupRegistry,
-  assertNever,
-  setupBot,
-} from "./registry";
-import { BotKind } from "./schemas";
+import { assertNever, BotKindSetupRegistry, setupBot } from "./registry";
+import type { BotKind } from "./schemas";
 import type { CoreEnv, FactoryContext } from "./types";
 
 // --- FACTORY ENGINE ---
+
+const botCache = new Map<string, Bot<FactoryContext>>();
 
 export async function handleUpdate(
   botId: string,
@@ -47,7 +38,7 @@ export async function handleUpdate(
     return new Response("Service configuration error", { status: 503 });
   }
 
-  const db = env.DB;
+  const _db = env.DB;
 
   if (!token?.includes(":") || token.length < 10) {
     console.error(`[FATAL] Invalid token for bot ${botId}`);
@@ -81,20 +72,71 @@ export async function handleUpdate(
     supports_join_request_queries: false,
   };
 
-  const bot = new Bot<FactoryContext>(token, { botInfo });
+  let bot = botCache.get(botId);
+
+  if (!bot) {
+    bot = new Bot<FactoryContext>(token, { botInfo });
+    botCache.set(botId, bot);
+
+    await setupBotMiddleware(bot, botId, env, waitUntil, host);
+  }
 
   const currentEnv = env;
   const currentBotId = botId;
   const currentHost = host;
   const currentWaitUntil = waitUntil;
-  const _currentDb = db;
+
+  // Attach env/botId/host/waitUntil to update for conversations plugin
+  // Grammy's conversations creates new Context for waitFor() without running middleware
+  // Mutating the update ensures the new ctx.update.env/botId are available
+  Object.assign(update, {
+    env: currentEnv,
+    botId: currentBotId,
+    host: currentHost,
+    waitUntil: currentWaitUntil,
+  });
+
+  try {
+    await bot.handleUpdate(update);
+  } catch (e) {
+    console.error(
+      JSON.stringify({
+        level: "error",
+        tag: "UPDATE_FAILURE",
+        botId,
+        envMissing: !currentEnv?.DB,
+        error: String(e),
+        timestamp: new Date().toISOString(),
+      }),
+    );
+    // Even if it fails, we usually want to return 200 to Telegram unless we want them to retry
+    // For MVP, let's just return 200 and rely on logs.
+  }
+
+  return new Response("OK");
+}
+
+async function setupBotMiddleware(
+  bot: Bot<FactoryContext>,
+  botId: string,
+  env: CoreEnv,
+  _waitUntil: (promise: Promise<unknown>) => void,
+  _host: string,
+): Promise<void> {
+  const db = env.DB;
 
   bot.use(async (ctx, next) => {
-    ctx.env = currentEnv;
-    ctx.botId = currentBotId;
-    ctx.host = currentHost;
+    // Retrieve request-specific context from the update object
+    const reqContext = ctx.update as unknown as {
+      env: CoreEnv;
+      host: string;
+      waitUntil: (promise: Promise<unknown>) => void;
+    };
+    ctx.env = reqContext.env;
+    ctx.botId = botId;
+    ctx.host = reqContext.host;
     ctx.platform = "telegram";
-    ctx.waitUntil = currentWaitUntil;
+    ctx.waitUntil = reqContext.waitUntil;
     await next();
   });
 
@@ -115,22 +157,40 @@ export async function handleUpdate(
   // Post-session middleware to sync request context to session for conversation fallback
   bot.use(async (ctx, next) => {
     if (ctx.session) {
-      ctx.session._titaniumEnv = currentEnv;
-      ctx.session._titaniumBotId = currentBotId;
-      ctx.session._titaniumHost = currentHost;
+      ctx.session._titaniumEnv = ctx.env;
+      ctx.session._titaniumBotId = ctx.botId;
+      ctx.session._titaniumHost = ctx.host;
     }
     await next();
   });
 
   // Conversation storage (using dedicated factory_conversations table)
-  const convoRaw = await D1Adapter.create<VersionedState<ConversationData>>(
-    db,
-    "factory_conversations",
-  );
+  // D1Adapter.create is async, so we might need a different approach for pure middleware setup
+  // if we want to avoid awaiting inside the setup.
+  // Actually, grammY allows async setup if we do it before the bot starts handling updates.
+
   const convoAdapter: StorageAdapter<VersionedState<ConversationData>> = {
-    read: (key) => convoRaw.read(key),
-    write: (key, value) => convoRaw.write(key, value),
-    delete: (key) => convoRaw.delete(key),
+    read: async (key) => {
+      const adapter = await D1Adapter.create<VersionedState<ConversationData>>(
+        db,
+        "factory_conversations",
+      );
+      return adapter.read(key);
+    },
+    write: async (key, value) => {
+      const adapter = await D1Adapter.create<VersionedState<ConversationData>>(
+        db,
+        "factory_conversations",
+      );
+      return adapter.write(key, value);
+    },
+    delete: async (key) => {
+      const adapter = await D1Adapter.create<VersionedState<ConversationData>>(
+        db,
+        "factory_conversations",
+      );
+      return adapter.delete(key);
+    },
   };
 
   bot.use(
@@ -149,7 +209,7 @@ export async function handleUpdate(
   if (botId === "botfather") {
     setupBotFather(botId, bot);
   } else {
-    // Lookup bot_kind to decide setup
+    // Lookup bot_kind to decide setup during initialization
     const botRow = await db
       .prepare(
         "SELECT bot_kind, config_json FROM factory_bots WHERE bot_id = ?",
@@ -165,39 +225,8 @@ export async function handleUpdate(
         assertNever(botRow.bot_kind as never);
       }
     } else {
+      // Fallback for bots not yet in factory_bots table or generic setup
       setupBot(botId, bot);
     }
   }
-
-  // Attach env/botId/host/waitUntil to update for conversations plugin
-  // Grammy's conversations creates new Context for waitFor() without running middleware
-  // Mutating the update ensures the new ctx.update.env/botId are available
-  Object.assign(update, {
-    env: currentEnv,
-    botId: currentBotId,
-    host: currentHost,
-    waitUntil: currentWaitUntil,
-  });
-
-  const runUpdate = async () => {
-    try {
-      await bot.handleUpdate(update);
-    } catch (e) {
-      console.error(
-        JSON.stringify({
-          level: "error",
-          tag: "UPDATE_FAILURE",
-          botId,
-          envMissing: !currentEnv?.DB,
-          error: String(e),
-          timestamp: new Date().toISOString(),
-        }),
-      );
-    }
-  };
-
-  waitUntil(runUpdate());
-
-  return new Response("OK");
 }
-

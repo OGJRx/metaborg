@@ -45,7 +45,7 @@ export function validateAppointmentSlot(
 
   // Current time in business timezone
   const nowInTZ = new Date(
-    `${p.year}-${(p.month ?? "1").padStart(2, "0")}-${(p.day ?? "1").padStart(2, "0")}T${(p.hour ?? "0").padStart(2, "0")}:${(p.minute ?? "0").padStart(2, "0")}:${(p.second ?? "0").padStart(2, "0")}`,
+    `${p["year"]}-${(p["month"] ?? "1").padStart(2, "0")}-${(p["day"] ?? "1").padStart(2, "0")}T${(p["hour"] ?? "0").padStart(2, "0")}:${(p["minute"] ?? "0").padStart(2, "0")}:${(p["second"] ?? "0").padStart(2, "0")}`,
   );
 
   // Buffer check

@@ -49,8 +49,8 @@ async function rotateMasterKey(
 
 // Note: This script is intended to be run in a controlled environment or as part of a CLI.
 // In a real scenario, you would pass the secrets via environment variables.
-const OLD_SECRET = process.env.OLD_TITANIUM_API_SECRET;
-const NEW_SECRET = process.env.NEW_TITANIUM_API_SECRET;
+const OLD_SECRET = process.env["OLD_TITANIUM_API_SECRET"];
+const NEW_SECRET = process.env["NEW_TITANIUM_API_SECRET"];
 const DB = (globalThis as unknown as { DB: D1Database }).DB; // D1 binding when running via wrangler execute
 
 if (!OLD_SECRET || !NEW_SECRET || !DB) {

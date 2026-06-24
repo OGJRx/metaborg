@@ -1,10 +1,7 @@
-import { createConversation } from "@grammyjs/conversations";
-import { Bot, session } from "grammy";
 import { describe, expect, it, vi } from "vitest";
-import { RelationalSessionAdapter } from "../src/factory/adapter";
 import { handleAgendadoUpdate } from "../src/factory/flows/agendado";
 import { AgendadoConfigSchema } from "../src/factory/schemas";
-import type { FactoryContext, TitaniumSession } from "../src/factory/types";
+import type { FactoryContext } from "../src/factory/types";
 
 describe("Isolate Kill Simulation", () => {
   it("should persist session and idempotency even if process dies mid-execution", async () => {

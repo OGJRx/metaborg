@@ -1,4 +1,5 @@
 import { createConversation } from "@grammyjs/conversations";
+import type { Bot } from "grammy";
 import { InlineKeyboard } from "grammy";
 import { buildCallback, parseCallback } from "./callback";
 import { feedbackConversation } from "./conversations";
@@ -11,12 +12,11 @@ import {
 } from "./handlers";
 import {
   AgendadoConfigSchema,
-  BotKind,
+  type BotKind,
   MenuSchema,
   ToolSpecialistConfigSchema,
 } from "./schemas";
 import type { FactoryContext, Menu } from "./types";
-import type { Bot } from "grammy";
 
 export type SetupFn = (
   botId: string,

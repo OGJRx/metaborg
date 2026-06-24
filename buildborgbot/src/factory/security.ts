@@ -79,17 +79,16 @@ export async function decrypt(
  * Uses a double-HMAC pattern to ensure constant time regardless of input length.
  */
 export async function timingSafeEqual(
-  a?: string | null,
-  b?: string | null,
+  a: string | null | undefined,
+  b: string | null | undefined,
+  secret: string,
 ): Promise<boolean> {
   if (!a || !b) return false;
 
   const encoder = new TextEncoder();
-  // Use a random key for HMAC to prevent pre-computation attacks
-  const keyData = crypto.getRandomValues(new Uint8Array(32));
   const key = await crypto.subtle.importKey(
     "raw",
-    keyData,
+    encoder.encode(secret),
     { name: "HMAC", hash: "SHA-256" },
     false,
     ["sign"],
