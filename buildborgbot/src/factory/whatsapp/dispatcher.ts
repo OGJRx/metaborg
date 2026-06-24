@@ -2,7 +2,7 @@ import { RelationalSessionAdapter } from "../adapter";
 import { handleAgendadoUpdate } from "../flows/agendado";
 import { AgendadoConfigSchema } from "../schemas";
 import { decrypt, deriveKey } from "../security";
-import type { CoreEnv, FactoryContext } from "../types";
+import type { CoreEnv, FactoryContext, TitaniumSession } from "../types";
 import {
   validateWhatsAppSignature,
   type WhatsAppInboundEvent,
@@ -12,7 +12,7 @@ import { sendWhatsAppMessage } from "./outbound";
 export async function handleWhatsAppWebhook(
   req: Request,
   env: CoreEnv,
-  _ctx: ExecutionContext,
+  ctx: ExecutionContext,
 ): Promise<Response> {
   const url = new URL(req.url);
 
@@ -77,7 +77,7 @@ export async function handleWhatsAppWebhook(
   const message = entry.messages?.[0];
   if (!message) return new Response("OK");
 
-  // Idempotency
+  // Idempotency: Mark BEFORE processing
   const updateId = message.id;
   const alreadyProcessed = await env.DB.prepare(
     "SELECT 1 FROM factory_processed_updates WHERE bot_id = ? AND update_id = ?",
@@ -86,6 +86,12 @@ export async function handleWhatsAppWebhook(
     .first();
 
   if (alreadyProcessed) return new Response("OK");
+
+  await env.DB.prepare(
+    "INSERT INTO factory_processed_updates (bot_id, update_id, processed_at) VALUES (?, ?, unixepoch())",
+  )
+    .bind(bot.bot_id, updateId)
+    .run();
 
   // Dispatch logic
   if (bot.bot_kind === "agendado") {
@@ -112,25 +118,29 @@ export async function handleWhatsAppWebhook(
       env,
       host: "unknown",
       platform: "whatsapp",
-      waitUntil: () => {}, // TODO: Proper waitUntil from ctx if needed
-      session: (session as any) || { step_data: {}, paso_actual: 0 },
+      waitUntil: (p: Promise<unknown>) => ctx.waitUntil(p),
+      session: (session as TitaniumSession) || {
+        step_data: {},
+        paso_actual: 0,
+      },
       chat: {
-        id: parseInt(chatId.replace(/\D/g, ""), 10) || 0,
+        id: Number.parseInt(chatId.replace(/\D/g, ""), 10) || 0,
         type: "private",
-        first_name: "WA User",
       },
       from: {
-        id: parseInt(chatId.replace(/\D/g, ""), 10) || 0,
+        id: Number.parseInt(chatId.replace(/\D/g, ""), 10) || 0,
         first_name: "WA User",
         is_bot: false,
       },
-      message: message.text ? (({ text: message.text.body } as any)) : undefined,
+      message: message.text
+        ? ({ text: message.text.body } as unknown as FactoryContext["message"])
+        : undefined,
       callbackQuery: message.interactive
-        ? (({
+        ? ({
             data:
               message.interactive.button_reply?.id ||
               message.interactive.list_reply?.id,
-          } as any))
+          } as unknown as FactoryContext["callbackQuery"])
         : undefined,
       reply: async (text: string) => {
         await sendWhatsAppMessage(phoneNumberId, decryptedToken, {
@@ -139,9 +149,12 @@ export async function handleWhatsAppWebhook(
           type: "text",
           text: { body: text },
         });
-        return {} as any;
+        return {} as never;
       },
-      replyInteractiveButtons: async (body: string, buttons: any[]) => {
+      replyInteractiveButtons: async (
+        body: string,
+        buttons: { id: string; title: string }[],
+      ) => {
         await sendWhatsAppMessage(phoneNumberId, decryptedToken, {
           messaging_product: "whatsapp",
           to: chatId,
@@ -154,12 +167,15 @@ export async function handleWhatsAppWebhook(
             },
           },
         });
-        return {} as any;
+        return {} as never;
       },
       replyInteractiveList: async (
         body: string,
         button: string,
-        sections: any[],
+        sections: {
+          title: string;
+          rows: { id: string; title: string; description?: string }[];
+        }[],
       ) => {
         await sendWhatsAppMessage(phoneNumberId, decryptedToken, {
           messaging_product: "whatsapp",
@@ -168,24 +184,21 @@ export async function handleWhatsAppWebhook(
           interactive: {
             type: "list",
             body: { text: body },
-            action: { button, sections },
+            action: {
+              button,
+              sections: sections as unknown as Record<string, unknown>[],
+            },
           },
         });
-        return {} as any;
+        return {} as never;
       },
       hasCommand: (cmd: string) => message.text?.body === `/${cmd}`,
-    } as any;
+    } as unknown as FactoryContext;
 
     await handleAgendadoUpdate(waContext, config);
 
     // Persist session
     await sessionAdapter.write(sessionKey, waContext.session);
-
-    await env.DB.prepare(
-      "INSERT INTO factory_processed_updates (bot_id, update_id, processed_at) VALUES (?, ?, unixepoch())",
-    )
-      .bind(bot.bot_id, updateId)
-      .run();
   }
 
   return new Response("OK");

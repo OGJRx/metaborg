@@ -12,7 +12,7 @@ export interface WhatsAppMessagePayload {
     header?: { type: "text"; text: string };
     body: { text: string };
     footer?: { text: string };
-    action: any;
+    action: Record<string, unknown>;
   };
 }
 

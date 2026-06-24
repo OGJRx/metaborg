@@ -29,26 +29,40 @@ export class RelationalSessionAdapter
     const [_, chatId, botId] = key.split(":");
     if (!chatId || !botId) return;
 
-    const session_id = `S-${Date.now()}-${chatId.slice(-4)}`;
     const step_data = JSON.stringify(value.step_data || {});
     const paso_actual = value.paso_actual || 0;
+    const estado_flujo = value.estado_flujo || "activo";
     const platform = "telegram"; // For now, handle platform in engine
     const expires_at = new Date(Date.now() + 24 * 3600 * 1000).toISOString();
 
-    await this.db
+    // Atomic update or insert using a transaction-safe pattern for D1
+    // First, try to update an existing active session
+    const updateRes = await this.db
       .prepare(
-        "INSERT INTO factory_sessions (session_id, bot_id, platform, chat_id, paso_actual, step_data, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT(bot_id, platform, chat_id, estado_flujo) WHERE estado_flujo NOT IN ('confirmado', 'cancelado') DO UPDATE SET paso_actual = excluded.paso_actual, step_data = excluded.step_data, updated_at = CURRENT_TIMESTAMP",
+        "UPDATE factory_sessions SET paso_actual = ?, step_data = ?, estado_flujo = ?, updated_at = CURRENT_TIMESTAMP WHERE bot_id = ? AND platform = ? AND chat_id = ? AND estado_flujo = 'activo'",
       )
-      .bind(
-        session_id,
-        botId,
-        platform,
-        chatId,
-        paso_actual,
-        step_data,
-        expires_at,
-      )
+      .bind(paso_actual, step_data, estado_flujo, botId, platform, chatId)
       .run();
+
+    if (updateRes.meta.changes === 0) {
+      // If no active session was updated, insert a new one
+      const session_id = `S-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
+      await this.db
+        .prepare(
+          "INSERT INTO factory_sessions (session_id, bot_id, platform, chat_id, paso_actual, step_data, estado_flujo, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        )
+        .bind(
+          session_id,
+          botId,
+          platform,
+          chatId,
+          paso_actual,
+          step_data,
+          estado_flujo,
+          expires_at,
+        )
+        .run();
+    }
   }
 
   async delete(_key: string): Promise<void> {

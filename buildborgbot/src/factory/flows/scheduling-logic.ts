@@ -13,16 +13,16 @@ export function validateAppointmentSlot(
   timezone: string,
 ): SlotValidationResult {
   const fParts = fecha.split("-").map(Number);
-  const y = fParts[0] ?? 0;
-  const m = fParts[1] ?? 0;
-  const d = fParts[2] ?? 0;
+  const _y = fParts[0] ?? 0;
+  const _m = fParts[1] ?? 0;
+  const _d = fParts[2] ?? 0;
   const hParts = hora.split(":").map(Number);
-  const hh = hParts[0] ?? 0;
-  const mm = hParts[1] ?? 0;
+  const _hh = hParts[0] ?? 0;
+  const _mm = hParts[1] ?? 0;
 
   // Use Intl to get offset or just use a Date with target timezone if environment supports it
   // In Cloudflare Workers, we can use 'America/Caracas' etc.
-  const tentativeDate = new Date(`${fecha}T${hora}:00`);
+  const _tentativeDate = new Date(`${fecha}T${hora}:00`);
 
   // Simple TZ check: get local time in target TZ
   const formatter = new Intl.DateTimeFormat("en-US", {
@@ -38,14 +38,14 @@ export function validateAppointmentSlot(
 
   const now = new Date();
   const parts = formatter.formatToParts(now);
-  const p: Record<string, any> = {};
-  parts.forEach((part) => {
+  const p: Record<string, string> = {};
+  for (const part of parts) {
     p[part.type] = part.value;
-  });
+  }
 
   // Current time in business timezone
   const nowInTZ = new Date(
-    `${p["year"]}-${p["month"].padStart(2, "0")}-${p["day"].padStart(2, "0")}T${p["hour"].padStart(2, "0")}:${p["minute"].padStart(2, "0")}:${p["second"].padStart(2, "0")}`,
+    `${p.year}-${(p.month ?? "1").padStart(2, "0")}-${(p.day ?? "1").padStart(2, "0")}T${(p.hour ?? "0").padStart(2, "0")}:${(p.minute ?? "0").padStart(2, "0")}:${(p.second ?? "0").padStart(2, "0")}`,
   );
 
   // Buffer check
@@ -129,7 +129,8 @@ export async function createTicketAtomic(
     capacity: number;
   },
 ): Promise<{ success: boolean; ticketId?: string }> {
-  const ticketId = `T-${Date.now()}-${crypto.randomUUID().slice(0, 4)}`.toUpperCase();
+  const ticketId =
+    `T-${Date.now()}-${crypto.randomUUID().slice(0, 4)}`.toUpperCase();
 
   const res = await db
     .prepare(
