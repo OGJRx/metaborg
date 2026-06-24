@@ -83,7 +83,11 @@ describe("Worker Entry Point", () => {
       bot_name: "Bot One",
       token_var_name: "BOT1_TOKEN",
       bot_kind: "open_chat" as const,
-      config_json: "{}",
+      config_json: JSON.stringify({
+        system_prompt: "test prompt",
+        welcome_message: "welcome",
+        menu_json: "[]",
+      }),
     };
 
     const request = new Request("http://localhost/api/factory/config", {

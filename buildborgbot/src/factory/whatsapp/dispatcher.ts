@@ -198,7 +198,20 @@ export async function handleWhatsAppWebhook(
     await handleAgendadoUpdate(waContext, config);
 
     // Persist session
-    await sessionAdapter.write(sessionKey, waContext.session);
+    ctx.waitUntil(
+      sessionAdapter.write(sessionKey, waContext.session).catch((err) => {
+        console.error(
+          JSON.stringify({
+            level: "error",
+            tag: "WHATSAPP_SESSION_WRITE_FAILED",
+            botId: bot.bot_id,
+            chatId,
+            error: String(err),
+            timestamp: new Date().toISOString(),
+          }),
+        );
+      }),
+    );
   }
 
   return new Response("OK");

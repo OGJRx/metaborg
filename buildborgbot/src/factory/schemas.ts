@@ -129,13 +129,19 @@ export const BotConfigSchema = z.discriminatedUnion("bot_kind", [
   }),
 ]);
 
+export const BotKindEnum = z.enum([
+  "open_chat",
+  "agendado",
+  "tool_specialist",
+  "kernel_admin",
+]);
+export type BotKind = z.infer<typeof BotKindEnum>;
+
 export const ConfigSchema = z.object({
   bot_id: z.string(),
   bot_name: z.string(),
   token_var_name: z.string(),
-  bot_kind: z
-    .enum(["open_chat", "agendado", "tool_specialist", "kernel_admin"])
-    .default("open_chat"),
+  bot_kind: BotKindEnum.default("open_chat"),
   config_json: z.string(),
   system_prompt: z.string().optional(),
   welcome_message: z.string().optional(),

@@ -1,3 +1,4 @@
+import { BotConfigSchema } from "./schemas";
 import { decrypt, deriveKey, encrypt } from "./security";
 import type { CoreEnv } from "./types";
 export async function isUpdateProcessed(
@@ -68,6 +69,7 @@ export async function upsertBotConfig(
   webhook_ok?: boolean;
   webhook_error?: string;
   error?: string;
+  details?: unknown;
 }> {
   const existing = await db
     .prepare(
@@ -85,6 +87,32 @@ export async function upsertBotConfig(
   let tokenCiphertext = existing?.token || null;
   let tokenIv = existing?.token_iv || null;
   const key = await deriveKey(env.TITANIUM_API_SECRET);
+
+  let parsedConfigJson: Record<string, unknown>;
+  try {
+    parsedConfigJson = JSON.parse(validated.config_json);
+  } catch {
+    return { success: false, error: "config_json must be valid JSON" };
+  }
+
+  // Prohibir bot_kind dentro de config_json si discrepa
+  if (
+    parsedConfigJson.bot_kind &&
+    parsedConfigJson.bot_kind !== validated.bot_kind
+  ) {
+    return {
+      success: false,
+      error: "bot_kind in config_json must match request bot_kind",
+    };
+  }
+
+  // Validar discriminatedUnion completo
+  try {
+    BotConfigSchema.parse({ bot_kind: validated.bot_kind, ...parsedConfigJson });
+  } catch (e) {
+    return { success: false, error: "Invalid config for bot_kind", details: e };
+  }
+
   if (validated.token) {
     const encrypted = await encrypt(validated.token, key);
     tokenCiphertext = encrypted.ciphertext;

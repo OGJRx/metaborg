@@ -43,6 +43,8 @@ jobs:
         run: npx tsc --noEmit
       - name: 🧪 Tests
         run: npm test
+      - name: 🔐 Security Audit (Production Only)
+        run: npm audit --audit-level=high --omit=dev
       - name: 📐 Config Matrix Validation
         run: npx tsx scripts/validate-config-matrix.ts
 
