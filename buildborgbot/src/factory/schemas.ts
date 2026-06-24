@@ -97,6 +97,17 @@ export const ToolSpecialistConfigSchema = z.object({
   lookup_source: z.enum(["obd_db", "parts_catalog", "none"]),
 });
 
+export const KernelConfigSchema = z.object({
+  system_prompt: z.string(),
+  tools_enabled: z.array(z.string()).default([
+    "list_tickets",
+    "get_ticket_detail",
+    "daily_summary",
+    "generate_invoice",
+    "send_reminder",
+  ]),
+});
+
 export const BotConfigSchema = z.discriminatedUnion("bot_kind", [
   z.object({
     bot_kind: z.literal("open_chat"),
@@ -110,6 +121,10 @@ export const BotConfigSchema = z.discriminatedUnion("bot_kind", [
     bot_kind: z.literal("tool_specialist"),
     ...ToolSpecialistConfigSchema.shape,
   }),
+  z.object({
+    bot_kind: z.literal("kernel_admin"),
+    ...KernelConfigSchema.shape,
+  }),
 ]);
 
 export const ConfigSchema = z.object({
@@ -117,7 +132,7 @@ export const ConfigSchema = z.object({
   bot_name: z.string(),
   token_var_name: z.string(),
   bot_kind: z
-    .enum(["open_chat", "agendado", "tool_specialist"])
+    .enum(["open_chat", "agendado", "tool_specialist", "kernel_admin"])
     .default("open_chat"),
   config_json: z.string(),
   system_prompt: z.string().optional(),
@@ -126,6 +141,8 @@ export const ConfigSchema = z.object({
   token: z.string().optional(),
   meta_phone_number_id: z.string().optional(),
   meta_app_secret: z.string().optional(),
+  stack_id: z.string().optional(),
+  owner_id: z.number().optional(),
 });
 
 export const PatchConfigSchema = ConfigSchema.partial().omit({ bot_id: true });

@@ -6,6 +6,7 @@ import {
   upsertBotConfig,
 } from "./factory/platform";
 import {
+  AgendadoConfigSchema,
   ConfigSchema,
   MemoryQuerySchema,
   PatchConfigSchema,
@@ -22,8 +23,7 @@ import {
 import { summarizeConversation } from "./factory/summarize";
 import type { CoreEnv } from "./factory/types";
 import { handleWhatsAppWebhook } from "./factory/whatsapp/dispatcher";
-import { AgendadoConfigSchema } from "./factory/schemas";
-import { getMiniAppHTML } from "./miniapp/app";
+import { getMiniAppAsset } from "./miniapp/app";
 
 async function validateTelegramInitData(
   initData: string,
@@ -98,19 +98,29 @@ export default {
     }
 
     if (url.pathname.startsWith("/app/")) {
-      const slug = url.pathname.split("/")[2];
+      const parts = url.pathname.split("/");
+      const slug = parts[2] || "";
+      const assetPath =
+        parts.length > 3 && parts[3] !== "" ? parts.slice(3).join("/") : "index.html";
+
       const bot = await env.DB.prepare(
-        "SELECT bot_name, bot_kind, config_json FROM factory_bots WHERE slug = ?",
+        "SELECT bot_name, bot_kind, config_json FROM factory_bots WHERE slug = ? OR bot_id = ?",
       )
-        .bind(slug)
+        .bind(slug, slug)
         .first<{ bot_name: string; bot_kind: string; config_json: string }>();
 
       if (!bot) return new Response("Not Found", { status: 404 });
 
-      return new Response(
-        getMiniAppHTML(bot.bot_name, bot.bot_kind, bot.config_json),
-        { headers: { "content-type": "text/html" } },
+      const asset = getMiniAppAsset(
+        assetPath,
+        bot.bot_name,
+        bot.bot_kind,
+        bot.config_json,
       );
+
+      return new Response(asset.content, {
+        headers: { "content-type": asset.contentType },
+      });
     }
 
     if (url.pathname === "/api/miniapp/config" && request.method === "POST") {
@@ -144,8 +154,6 @@ export default {
       try {
         if (bot.bot_kind === "agendado") {
           AgendadoConfigSchema.parse(newConfig);
-        } else if (bot.bot_kind === "tool_specialist") {
-          // ToolSpecialistConfigSchema if applicable
         }
       } catch (e) {
         return Response.json(
@@ -357,10 +365,17 @@ export default {
         env.DB,
         env,
         {
-          ...validated,
-          system_prompt: validated.system_prompt ?? "",
-          welcome_message: validated.welcome_message ?? "",
-          menu_json: validated.menu_json ?? "[]",
+          bot_id: validated.bot_id,
+          bot_name: validated.bot_name,
+          token_var_name: validated.token_var_name,
+          system_prompt: validated.system_prompt || "",
+          welcome_message: validated.welcome_message || "",
+          menu_json: validated.menu_json || "[]",
+          bot_kind: validated.bot_kind,
+          config_json: validated.config_json,
+          ...(validated.token !== undefined && { token: validated.token }),
+          ...(validated.stack_id !== undefined && { stack_id: validated.stack_id }),
+          ...(validated.owner_id !== undefined && { owner_id: validated.owner_id }),
         },
         request.headers.get("host") || "unknown",
       );
@@ -550,7 +565,7 @@ export default {
         const validated = PatchConfigSchema.parse(body);
 
         const updates: string[] = [];
-        const values: (string | undefined)[] = [];
+        const values: (string | number | undefined)[] = [];
 
         Object.entries(validated).forEach(([key, value]) => {
           if (value !== undefined) {
