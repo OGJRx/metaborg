@@ -97,7 +97,9 @@ export async function upsertBotConfig(
 
   // Prohibir bot_kind dentro de config_json si discrepa
   if (
+    // biome-ignore lint/complexity/useLiteralKeys: required by tsconfig noPropertyAccessFromIndexSignature
     parsedConfigJson["bot_kind"] &&
+    // biome-ignore lint/complexity/useLiteralKeys: required by tsconfig noPropertyAccessFromIndexSignature
     parsedConfigJson["bot_kind"] !== validated.bot_kind
   ) {
     return {

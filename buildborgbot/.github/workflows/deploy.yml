@@ -69,8 +69,8 @@ jobs:
             "TELEGRAM_BOT_TOKEN"
             "TITANIUM_API_SECRET"
             "GEMINI_API_KEY"
-            "MIGRATION_KEY"
             "CLOUDFLARE_ACCOUNT_ID"
+            "CLOUDFLARE_API_TOKEN"
           )
           for secret in "${FACTORY_SECRETS[@]}"; do
             if [ -z "${!secret}" ]; then
@@ -89,14 +89,13 @@ jobs:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TITANIUM_API_SECRET: ${{ secrets.TITANIUM_API_SECRET }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          MIGRATION_KEY: ${{ secrets.MIGRATION_KEY }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
 
       - name: 🔐 Sync Factory Secrets to Worker
         run: |
           echo "${{ secrets.GEMINI_API_KEY }}" | npx wrangler secret put GEMINI_API_KEY
           echo "${{ secrets.TITANIUM_API_SECRET }}" | npx wrangler secret put TITANIUM_API_SECRET
-          echo "${{ secrets.MIGRATION_KEY }}" | npx wrangler secret put MIGRATION_KEY
           echo "${{ secrets.TELEGRAM_BOT_TOKEN }}" | npx wrangler secret put TELEGRAM_BOT_TOKEN
           if [ -n "${{ secrets.ADMIN_TELEGRAM_IDS }}" ]; then
             echo "${{ secrets.ADMIN_TELEGRAM_IDS }}" | npx wrangler secret put ADMIN_TELEGRAM_IDS

@@ -52,7 +52,7 @@ export const AgendadoConfigSchema = z.object({
     confirm_message: z
       .string()
       .default(
-        "✅ <b>¡Cita confirmada!</b>\n\nTu ticket es: <code>${ticketId}</code>",
+        `✅ <b>¡Cita confirmada!</b>\n\nTu ticket es: <code>${"${"}ticketId}</code>`,
       ),
     invalid_input_message: z
       .string()

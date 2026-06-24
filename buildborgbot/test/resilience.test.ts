@@ -13,7 +13,7 @@ describe("Isolate Kill Simulation", () => {
           all: vi.fn().mockResolvedValue({ results: [] }),
         }),
       }),
-    } as any;
+    } as unknown as Record<string, unknown>;
 
     const config = AgendadoConfigSchema.parse({
       business_identity: {
@@ -58,8 +58,12 @@ describe("Isolate Kill Simulation", () => {
     // Simulate update processing
     try {
       await handleAgendadoUpdate(ctx, config);
-    } catch (e: any) {
-      expect(e.message).toBe("SIMULATED_ISOLATE_KILL");
+    } catch (e: unknown) {
+      if (e instanceof Error) {
+        expect(e.message).toBe("SIMULATED_ISOLATE_KILL");
+      } else {
+        throw e;
+      }
     }
 
     // Even if it failed mid-way, the idempotency MARK should have happened BEFORE (in the caller)
