@@ -24,7 +24,6 @@ import {
   handleConfirmAndProcess,
   handleSummarize,
 } from "./handlers";
-import { markUpdateProcessed } from "./platform";
 import { AgendadoConfigSchema, MenuSchema } from "./schemas";
 import type { CoreEnv, FactoryContext, Menu } from "./types";
 
@@ -92,7 +91,7 @@ export async function handleUpdate(
   const currentBotId = botId;
   const currentHost = host;
   const currentWaitUntil = waitUntil;
-  const currentDb = db;
+  const _currentDb = db;
 
   bot.use(async (ctx, next) => {
     ctx.env = currentEnv;
@@ -184,9 +183,6 @@ export async function handleUpdate(
   const runUpdate = async () => {
     try {
       await bot.handleUpdate(update);
-      await (
-        await markUpdateProcessed(currentDb, botId, update.update_id)
-      ).run();
     } catch (e) {
       console.error(
         JSON.stringify({

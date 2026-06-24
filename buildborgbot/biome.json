@@ -4,7 +4,10 @@
   "linter": {
     "enabled": true,
     "rules": {
-      "preset": "recommended"
+      "preset": "recommended",
+      "suspicious": {
+        "noExplicitAny": "error"
+      }
     }
   },
   "formatter": {

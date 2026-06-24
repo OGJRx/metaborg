@@ -101,7 +101,9 @@ export default {
       const parts = url.pathname.split("/");
       const slug = parts[2] || "";
       const assetPath =
-        parts.length > 3 && parts[3] !== "" ? parts.slice(3).join("/") : "index.html";
+        parts.length > 3 && parts[3] !== ""
+          ? parts.slice(3).join("/")
+          : "index.html";
 
       const bot = await env.DB.prepare(
         "SELECT bot_name, bot_kind, config_json FROM factory_bots WHERE slug = ? OR bot_id = ?",
@@ -148,7 +150,7 @@ export default {
       const isValid = await validateTelegramInitData(initData, plainToken);
       if (!isValid) return new Response("Invalid signature", { status: 403 });
 
-      const newConfig = (await request.json()) as any;
+      const newConfig = (await request.json()) as Record<string, unknown>;
 
       // Validation logic: Ensure the config matches the bot_kind
       try {
@@ -211,9 +213,16 @@ export default {
         const body = await request.json();
         const update = TelegramUpdateSchema.parse(body) as Update;
 
+        // Idempotency: Mark BEFORE processing
         if (await isUpdateProcessed(env.DB, "botfather", update.update_id)) {
           return new Response("OK (already processed)");
         }
+
+        await env.DB.prepare(
+          "INSERT INTO factory_processed_updates (bot_id, update_id, processed_at) VALUES (?, ?, unixepoch())",
+        )
+          .bind("botfather", update.update_id)
+          .run();
 
         ctx.waitUntil(cleanupProcessedUpdates(env.DB));
 
@@ -258,10 +267,16 @@ export default {
       const body = await request.json();
       const update = TelegramUpdateSchema.parse(body) as Update;
 
-      // Idempotency Check
+      // Idempotency: Mark BEFORE processing
       if (await isUpdateProcessed(env.DB, botConfig.bot_id, update.update_id)) {
         return new Response("OK (already processed)");
       }
+
+      await env.DB.prepare(
+        "INSERT INTO factory_processed_updates (bot_id, update_id, processed_at) VALUES (?, ?, unixepoch())",
+      )
+        .bind(botConfig.bot_id, update.update_id)
+        .run();
 
       // Decrypt token
       let token: string;
@@ -374,8 +389,12 @@ export default {
           bot_kind: validated.bot_kind,
           config_json: validated.config_json,
           ...(validated.token !== undefined && { token: validated.token }),
-          ...(validated.stack_id !== undefined && { stack_id: validated.stack_id }),
-          ...(validated.owner_id !== undefined && { owner_id: validated.owner_id }),
+          ...(validated.stack_id !== undefined && {
+            stack_id: validated.stack_id,
+          }),
+          ...(validated.owner_id !== undefined && {
+            owner_id: validated.owner_id,
+          }),
         },
         request.headers.get("host") || "unknown",
       );

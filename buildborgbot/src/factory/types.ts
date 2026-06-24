@@ -41,6 +41,7 @@ export interface TitaniumSession extends Record<string, unknown> {
   _titaniumHost?: string;
   step_data?: Record<string, string>;
   paso_actual?: number;
+  estado_flujo?: "iniciado" | "completado" | "confirmado" | "cancelado";
 }
 
 export type FactoryContext = Context &
@@ -51,8 +52,18 @@ export type FactoryContext = Context &
     host: string;
     platform: "telegram" | "whatsapp";
     waitUntil: (promise: Promise<unknown>) => void;
-    replyInteractiveButtons?: (body: string, buttons: { id: string; title: string }[]) => Promise<unknown>;
-    replyInteractiveList?: (body: string, button: string, sections: { title: string; rows: { id: string; title: string; description?: string }[] }[]) => Promise<unknown>;
+    replyInteractiveButtons?: (
+      body: string,
+      buttons: { id: string; title: string }[],
+    ) => Promise<unknown>;
+    replyInteractiveList?: (
+      body: string,
+      button: string,
+      sections: {
+        title: string;
+        rows: { id: string; title: string; description?: string }[];
+      }[],
+    ) => Promise<unknown>;
     hasCommand?: (cmd: string) => boolean;
   };
 

@@ -126,9 +126,10 @@ export async function newBotConversation(
           keyboard = new InlineKeyboard().webApp("🛠️ Abrir Editor", webAppUrl);
         }
 
+        // @ts-expect-error - InlineKeyboard is compatible with reply_markup
         await tokenCtx.reply(msg, {
           parse_mode: "HTML",
-          reply_markup: keyboard as any,
+          reply_markup: keyboard,
         });
       } else {
         await tokenCtx.reply(

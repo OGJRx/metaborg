@@ -99,13 +99,15 @@ export const ToolSpecialistConfigSchema = z.object({
 
 export const KernelConfigSchema = z.object({
   system_prompt: z.string(),
-  tools_enabled: z.array(z.string()).default([
-    "list_tickets",
-    "get_ticket_detail",
-    "daily_summary",
-    "generate_invoice",
-    "send_reminder",
-  ]),
+  tools_enabled: z
+    .array(z.string())
+    .default([
+      "list_tickets",
+      "get_ticket_detail",
+      "daily_summary",
+      "generate_invoice",
+      "send_reminder",
+    ]),
 });
 
 export const BotConfigSchema = z.discriminatedUnion("bot_kind", [

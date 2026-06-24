@@ -1,80 +1,152 @@
-name: Deploy Bot Factory
+name: 🔱 TITANIUM FACTORY - Unified Pipeline
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
 
 permissions:
   contents: read
   id-token: write
 
+env:
+  NODE_VERSION: "24"
+
 jobs:
-  test:
+  entropy-check:
+    name: 🔬 Entropy Check
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
-          node-version: 24
+          node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
-      - name: Install dependencies
-        run: npm ci
-      - name: Lint
-        run: npx biome check .
-      - name: Type Check
-        run: npx tsc --noEmit
-      - name: Run Tests
-        run: npm test
-
-  deploy:
-    needs: test
-    runs-on: ubuntu-latest
-    name: Deploy to Cloudflare Workers
-    steps:
-      - uses: actions/checkout@v4
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: 'npm'
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Validate Secrets
+      - run: npm ci
+      - name: 🧹 Check for merge conflict markers
         run: |
-          if [ -z "${{ secrets.TELEGRAM_BOT_TOKEN }}" ]; then echo "::error::TELEGRAM_BOT_TOKEN is empty"; exit 1; fi
-          if [ -z "${{ secrets.TITANIUM_API_SECRET }}" ]; then echo "::error::TITANIUM_API_SECRET is empty"; exit 1; fi
-          if [ -z "${{ secrets.GEMINI_API_KEY }}" ]; then echo "::error::GEMINI_API_KEY is empty"; exit 1; fi
-          if [ -z "${{ secrets.MIGRATION_KEY }}" ]; then echo "::error::MIGRATION_KEY is empty"; exit 1; fi
-          if [ -z "${{ secrets.CLOUDFLARE_ACCOUNT_ID }}" ]; then echo "::error::CLOUDFLARE_ACCOUNT_ID is empty"; exit 1; fi
-          if [ -z "${{ vars.WORKER_URL }}" ]; then echo "::error::WORKER_URL is empty"; exit 1; fi
-      - name: Set Cloudflare Secrets
+          set -euo pipefail
+          if git grep -E "^<<<<<<<|^=======|^>>>>>>>" -- . ':(exclude)node_modules'; then
+            echo "❌ Merge conflict markers found in source code!"
+            exit 1
+          fi
+      - name: 📝 Lint (Zero Any Tolerance)
+        run: npx biome check .
+      - name: 📐 Type Check
+        run: npx tsc --noEmit
+      - name: 🧪 Tests
+        run: npm test
+      - name: 📐 Config Matrix Validation
+        run: npx tsx scripts/validate-config-matrix.ts
+
+  deploy-staging:
+    name: 🧪 Deploy Factory (Staging)
+    runs-on: ubuntu-latest
+    needs: entropy-check
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    environment: staging
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      - run: npm ci
+
+      - name: 🔐 Validate Factory Secrets
+        run: |
+          MISSING=0
+          FACTORY_SECRETS=(
+            "TELEGRAM_BOT_TOKEN"
+            "TITANIUM_API_SECRET"
+            "GEMINI_API_KEY"
+            "MIGRATION_KEY"
+            "CLOUDFLARE_ACCOUNT_ID"
+          )
+          for secret in "${FACTORY_SECRETS[@]}"; do
+            if [ -z "${!secret}" ]; then
+              echo "::error::Missing FACTORY secret: $secret"
+              MISSING=1
+            fi
+          done
+          if [ -z "${{ vars.WORKER_URL }}" ]; then
+            echo "::error::Missing WORKER_URL var"
+            MISSING=1
+          fi
+          if [ $MISSING -eq 1 ]; then
+            exit 1
+          fi
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TITANIUM_API_SECRET: ${{ secrets.TITANIUM_API_SECRET }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          MIGRATION_KEY: ${{ secrets.MIGRATION_KEY }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: 🔐 Sync Factory Secrets to Worker
         run: |
           echo "${{ secrets.GEMINI_API_KEY }}" | npx wrangler secret put GEMINI_API_KEY
           echo "${{ secrets.TITANIUM_API_SECRET }}" | npx wrangler secret put TITANIUM_API_SECRET
           echo "${{ secrets.MIGRATION_KEY }}" | npx wrangler secret put MIGRATION_KEY
           echo "${{ secrets.TELEGRAM_BOT_TOKEN }}" | npx wrangler secret put TELEGRAM_BOT_TOKEN
-          echo "${{ secrets.ADMIN_TELEGRAM_IDS }}" | npx wrangler secret put ADMIN_TELEGRAM_IDS
-      - name: Apply D1 Migrations
+          if [ -n "${{ secrets.ADMIN_TELEGRAM_IDS }}" ]; then
+            echo "${{ secrets.ADMIN_TELEGRAM_IDS }}" | npx wrangler secret put ADMIN_TELEGRAM_IDS
+          fi
+
+      - name: 🗄️ Apply D1 Migrations
         uses: cloudflare/wrangler-action@v3
         with:
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: d1 migrations apply bot_factory_db --remote
-      - name: Deploy Worker
+
+      - name: 🚀 Deploy Factory Worker
         uses: cloudflare/wrangler-action@v3
         with:
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: deploy
 
-      - name: Sync BotFather Webhook
+      - name: 🧪 Smoke Tests
+        run: |
+          echo "Running smoke tests against ${{ vars.WORKER_URL }}..."
+          curl -fsS "${{ vars.WORKER_URL }}/api/health" | grep -q '"status":"ok"'
+          echo "✅ Smoke tests passed"
+
+  deploy-prod:
+    name: 🚀 Deploy Factory (Production)
+    runs-on: ubuntu-latest
+    needs: deploy-staging
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      - run: npm ci
+
+      - name: 🗄️ Apply D1 Migrations
+        uses: cloudflare/wrangler-action@v3
+        with:
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: d1 migrations apply bot_factory_db --remote
+
+      - name: 🚀 Deploy Factory Worker
+        uses: cloudflare/wrangler-action@v3
+        with:
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: deploy
+
+      - name: 🔗 Sync BotFather Webhook
         env:
           WORKER_URL: ${{ vars.WORKER_URL }}
           TITANIUM_API_SECRET: ${{ secrets.TITANIUM_API_SECRET }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
         run: npx tsx scripts/setup-botfather.ts
-
-      # Future: Sync tenant bot webhooks
-      # - name: Sync Tenant Webhooks
-      #   run: ... (requires refactor of sync-webhooks.ts to use D1 instead of env vars)
