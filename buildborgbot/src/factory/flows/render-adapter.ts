@@ -70,7 +70,7 @@ export class TelegramRenderAdapter extends RenderAdapter {
     opts: RenderOptions & { ticketId: string },
   ): Promise<void> {
     const msg = opts.config.business_identity.confirm_message.replace(
-      "${ticketId}",
+      `${"${"}ticketId}`,
       opts.ticketId,
     );
     await opts.ctx.reply(msg, { parse_mode: "HTML" });
@@ -169,7 +169,7 @@ export class WhatsAppRenderAdapter extends RenderAdapter {
     opts: RenderOptions & { ticketId: string },
   ): Promise<void> {
     const msg = opts.config.business_identity.confirm_message
-      .replace("${ticketId}", opts.ticketId)
+      .replace(`${"${"}ticketId}`, opts.ticketId)
       .replace(/<[^>]*>/g, "");
     await opts.ctx.reply(`✅ ${msg}`);
     if (opts.config.business_identity.location_maps_url) {

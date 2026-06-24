@@ -44,8 +44,21 @@ export function validateAppointmentSlot(
   }
 
   // Current time in business timezone
+  // biome-ignore lint/complexity/useLiteralKeys: required by tsconfig noPropertyAccessFromIndexSignature
+  const year = p["year"];
+  // biome-ignore lint/complexity/useLiteralKeys: required by tsconfig noPropertyAccessFromIndexSignature
+  const month = (p["month"] ?? "1").padStart(2, "0");
+  // biome-ignore lint/complexity/useLiteralKeys: required by tsconfig noPropertyAccessFromIndexSignature
+  const day = (p["day"] ?? "1").padStart(2, "0");
+  // biome-ignore lint/complexity/useLiteralKeys: required by tsconfig noPropertyAccessFromIndexSignature
+  const hour = (p["hour"] ?? "0").padStart(2, "0");
+  // biome-ignore lint/complexity/useLiteralKeys: required by tsconfig noPropertyAccessFromIndexSignature
+  const minute = (p["minute"] ?? "0").padStart(2, "0");
+  // biome-ignore lint/complexity/useLiteralKeys: required by tsconfig noPropertyAccessFromIndexSignature
+  const second = (p["second"] ?? "0").padStart(2, "0");
+
   const nowInTZ = new Date(
-    `${p["year"]}-${(p["month"] ?? "1").padStart(2, "0")}-${(p["day"] ?? "1").padStart(2, "0")}T${(p["hour"] ?? "0").padStart(2, "0")}:${(p["minute"] ?? "0").padStart(2, "0")}:${(p["second"] ?? "0").padStart(2, "0")}`,
+    `${year}-${month}-${day}T${hour}:${minute}:${second}`,
   );
 
   // Buffer check
