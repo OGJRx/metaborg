@@ -97,8 +97,8 @@ export async function upsertBotConfig(
 
   // Prohibir bot_kind dentro de config_json si discrepa
   if (
-    parsedConfigJson.bot_kind &&
-    parsedConfigJson.bot_kind !== validated.bot_kind
+    parsedConfigJson["bot_kind"] &&
+    parsedConfigJson["bot_kind"] !== validated.bot_kind
   ) {
     return {
       success: false,
@@ -108,7 +108,10 @@ export async function upsertBotConfig(
 
   // Validar discriminatedUnion completo
   try {
-    BotConfigSchema.parse({ bot_kind: validated.bot_kind, ...parsedConfigJson });
+    BotConfigSchema.parse({
+      bot_kind: validated.bot_kind,
+      ...parsedConfigJson,
+    });
   } catch (e) {
     return { success: false, error: "Invalid config for bot_kind", details: e };
   }

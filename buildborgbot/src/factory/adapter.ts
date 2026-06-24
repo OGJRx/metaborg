@@ -65,7 +65,15 @@ export class RelationalSessionAdapter
     }
   }
 
-  async delete(_key: string): Promise<void> {
-    // Implement soft delete or mark as cancelled
+  async delete(key: string): Promise<void> {
+    const [_, chatId, botId] = key.split(":");
+    if (!chatId || !botId) return;
+
+    await this.db
+      .prepare(
+        "UPDATE factory_sessions SET estado_flujo = 'cancelado', updated_at = CURRENT_TIMESTAMP WHERE bot_id = ? AND chat_id = ? AND estado_flujo = 'activo'",
+      )
+      .bind(botId, chatId)
+      .run();
   }
 }

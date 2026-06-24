@@ -1,4 +1,5 @@
 import type { Update } from "grammy/types";
+import { cleanupExpiredCallbacks } from "./factory/callback";
 import { handleUpdate } from "./factory/engine";
 import {
   cleanupProcessedUpdates,
@@ -14,12 +15,7 @@ import {
   SummarizeSchema,
   TelegramUpdateSchema,
 } from "./factory/schemas";
-import {
-  decrypt,
-  deriveKey,
-  encrypt,
-  timingSafeEqual,
-} from "./factory/security";
+import { decrypt, deriveKey, timingSafeEqual } from "./factory/security";
 import { summarizeConversation } from "./factory/summarize";
 import type { CoreEnv } from "./factory/types";
 import { handleWhatsAppWebhook } from "./factory/whatsapp/dispatcher";
@@ -113,8 +109,14 @@ export default {
 
       if (!bot) return new Response("Not Found", { status: 404 });
 
+      // Sanitize assetPath to prevent path traversal
+      const sanitizedAssetPath = assetPath
+        .replace(/\.\./g, "")
+        .replace(/\/+/g, "/")
+        .replace(/^\//, "");
+
       const asset = getMiniAppAsset(
-        assetPath,
+        sanitizedAssetPath,
         bot.bot_name,
         bot.bot_kind,
         bot.config_json,
@@ -198,7 +200,13 @@ export default {
 
       // Special case: BotFather admin bot (not in factory_bots table)
       if (slug === "botfather") {
-        if (!(await timingSafeEqual(incomingSecret, env.TITANIUM_API_SECRET))) {
+        if (
+          !(await timingSafeEqual(
+            incomingSecret,
+            env.TITANIUM_API_SECRET,
+            env.TITANIUM_API_SECRET,
+          ))
+        ) {
           console.error(
             JSON.stringify({
               level: "error",
@@ -225,6 +233,7 @@ export default {
           .run();
 
         ctx.waitUntil(cleanupProcessedUpdates(env.DB));
+        ctx.waitUntil(cleanupExpiredCallbacks(env.DB));
 
         return await handleUpdate(
           "botfather",
@@ -251,7 +260,13 @@ export default {
       if (!botConfig) return new Response("Bot not found", { status: 404 });
 
       // Validate webhook secret (Timing-safe comparison)
-      if (!(await timingSafeEqual(incomingSecret, botConfig.webhook_secret))) {
+      if (
+        !(await timingSafeEqual(
+          incomingSecret,
+          botConfig.webhook_secret,
+          env.TITANIUM_API_SECRET,
+        ))
+      ) {
         console.error(
           JSON.stringify({
             level: "error",
@@ -278,6 +293,10 @@ export default {
         .bind(botConfig.bot_id, update.update_id)
         .run();
 
+      // Cleanup old updates (lazy)
+      ctx.waitUntil(cleanupProcessedUpdates(env.DB));
+      ctx.waitUntil(cleanupExpiredCallbacks(env.DB));
+
       // Decrypt token
       let token: string;
       if (botConfig.token && botConfig.token_iv) {
@@ -289,9 +308,6 @@ export default {
         });
       }
 
-      // Cleanup old updates (lazy)
-      ctx.waitUntil(cleanupProcessedUpdates(env.DB));
-
       return await handleUpdate(
         botConfig.bot_id,
         token,
@@ -300,43 +316,6 @@ export default {
         ctx.waitUntil.bind(ctx),
         request.headers.get("host") || "unknown",
       );
-    }
-
-    // --- Migration API ---
-    if (
-      url.pathname === "/api/factory/migrate-tokens" &&
-      request.method === "POST"
-    ) {
-      if (request.headers.get("x-migration-key") !== env.MIGRATION_KEY) {
-        return new Response("Unauthorized", { status: 401 });
-      }
-
-      const bots = await env.DB.prepare(
-        "SELECT bot_id, token_var_name, slug FROM factory_bots",
-      ).all<{ bot_id: string; token_var_name: string; slug: string }>();
-      const key = await deriveKey(env.TITANIUM_API_SECRET);
-
-      const statements = [];
-      for (const bot of bots.results || []) {
-        const token = env.BOT_TOKENS[bot.token_var_name];
-        if (token) {
-          const { ciphertext, iv } = await encrypt(token, key);
-          const webhookSecret = crypto.randomUUID();
-          const slug = bot.slug || `bot-${bot.bot_id.substring(0, 8)}`;
-
-          statements.push(
-            env.DB.prepare(
-              "UPDATE factory_bots SET token = ?, token_iv = ?, slug = ?, webhook_secret = ? WHERE bot_id = ?",
-            ).bind(ciphertext, iv, slug, webhookSecret, bot.bot_id),
-          );
-        }
-      }
-
-      if (statements.length > 0) {
-        await env.DB.batch(statements);
-      }
-
-      return Response.json({ success: true, migrated: statements.length });
     }
 
     // --- Platform Admins API ---

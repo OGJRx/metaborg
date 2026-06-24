@@ -25,7 +25,7 @@ export async function validateWhatsAppSignature(
   const hashArray = Array.from(new Uint8Array(mac));
   const digest = hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
 
-  return await timingSafeEqual(digest, signature);
+  return await timingSafeEqual(digest, signature, appSecret);
 }
 
 export interface WhatsAppInboundEvent {
