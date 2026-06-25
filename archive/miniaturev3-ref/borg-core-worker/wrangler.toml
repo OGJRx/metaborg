@@ -1,6 +1,6 @@
 name = "4agentsonline"
 main = "src/index.ts"
-compatibility_date = "2025-01-24"
+compatibility_date = "2026-06-25"
 compatibility_flags = ["nodejs_compat"]
 
 [vars]
