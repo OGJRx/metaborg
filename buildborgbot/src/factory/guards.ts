@@ -1,4 +1,4 @@
-import { FACTORY_ENV_SYMBOL, type CoreEnv, type FactoryContext } from "./types";
+import { type CoreEnv, FACTORY_ENV_SYMBOL, type FactoryContext } from "./types";
 
 export function assertEnv(
   ctx: FactoryContext,

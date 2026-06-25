@@ -1,10 +1,7 @@
 import type { Conversation } from "@grammyjs/conversations";
 import { assertEnv } from "./guards";
 import { upsertBotConfig } from "./platform";
-import {
-  GENERIC_AGENDADO_CONFIG,
-  WORKSHOP_AGENDADO_CONFIG,
-} from "./schemas";
+import { GENERIC_AGENDADO_CONFIG, WORKSHOP_AGENDADO_CONFIG } from "./schemas";
 import type { FactoryContext } from "./types";
 
 type Convo = Conversation<FactoryContext, FactoryContext>;

@@ -10,7 +10,7 @@ import { RelationalSessionAdapter } from "./adapter";
 import { setupBotFather } from "./botfather";
 import { assertNever, BotKindSetupRegistry, setupBot } from "./registry";
 import type { BotKind } from "./schemas";
-import { FACTORY_ENV_SYMBOL, type CoreEnv, type FactoryContext } from "./types";
+import { type CoreEnv, FACTORY_ENV_SYMBOL, type FactoryContext } from "./types";
 
 // --- FACTORY ENGINE ---
 
