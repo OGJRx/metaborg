@@ -10,7 +10,7 @@ import { RelationalSessionAdapter } from "./adapter";
 import { setupBotFather } from "./botfather";
 import { assertNever, BotKindSetupRegistry, setupBot } from "./registry";
 import type { BotKind } from "./schemas";
-import type { CoreEnv, FactoryContext } from "./types";
+import { FACTORY_ENV_SYMBOL, type CoreEnv, type FactoryContext } from "./types";
 
 // --- FACTORY ENGINE ---
 
@@ -89,8 +89,9 @@ export async function handleUpdate(
   // Attach env/botId/host/waitUntil to update for conversations plugin
   // Grammy's conversations creates new Context for waitFor() without running middleware
   // Mutating the update ensures the new ctx.update.env/botId are available
+  // We use FACTORY_ENV_SYMBOL to prevent D1 bindings from being serialized into sessions
   Object.assign(update, {
-    env: currentEnv,
+    [FACTORY_ENV_SYMBOL]: currentEnv,
     botId: currentBotId,
     host: currentHost,
     waitUntil: currentWaitUntil,
@@ -128,11 +129,11 @@ async function setupBotMiddleware(
   bot.use(async (ctx, next) => {
     // Retrieve request-specific context from the update object
     const reqContext = ctx.update as unknown as {
-      env: CoreEnv;
+      [FACTORY_ENV_SYMBOL]: CoreEnv;
       host: string;
       waitUntil: (promise: Promise<unknown>) => void;
     };
-    ctx.env = reqContext.env;
+    ctx.env = reqContext[FACTORY_ENV_SYMBOL];
     ctx.botId = botId;
     ctx.host = reqContext.host;
     ctx.platform = "telegram";

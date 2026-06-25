@@ -1,4 +1,4 @@
-import type { CoreEnv, FactoryContext } from "./types";
+import { FACTORY_ENV_SYMBOL, type CoreEnv, type FactoryContext } from "./types";
 
 export function assertEnv(
   ctx: FactoryContext,
@@ -6,12 +6,12 @@ export function assertEnv(
   // 1. First priority: Always check the update object, where we inject the REAL env
   if (ctx.update) {
     const ext = ctx.update as unknown as {
-      env?: CoreEnv;
+      [FACTORY_ENV_SYMBOL]?: CoreEnv;
       botId?: string;
       host?: string;
       waitUntil?: (promise: Promise<unknown>) => void;
     };
-    if (ext.env) ctx.env = ext.env;
+    if (ext[FACTORY_ENV_SYMBOL]) ctx.env = ext[FACTORY_ENV_SYMBOL];
     if (ext.botId) ctx.botId = ext.botId;
     if (ext.host) ctx.host = ext.host;
     if (ext.waitUntil) ctx.waitUntil = ext.waitUntil;

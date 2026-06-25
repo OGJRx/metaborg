@@ -3,6 +3,8 @@ import type { Context, SessionFlavor } from "grammy";
 import type { z } from "zod";
 import type { MenuSchema } from "./schemas";
 
+export const FACTORY_ENV_SYMBOL = Symbol("TITANIUM_FACTORY_ENV");
+
 export interface CoreEnv {
   DB: D1Database;
   GEMINI_API_KEY: string;
