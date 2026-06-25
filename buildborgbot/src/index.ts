@@ -321,7 +321,11 @@ export default {
     // --- Platform Admins API ---
     if (url.pathname === "/api/factory/admins") {
       if (
-        request.headers.get("x-titanium-api-secret") !== env.TITANIUM_API_SECRET
+        !(await timingSafeEqual(
+          request.headers.get("x-titanium-api-secret") || "",
+          env.TITANIUM_API_SECRET,
+          env.TITANIUM_API_SECRET,
+        ))
       ) {
         return new Response("Unauthorized", { status: 401 });
       }
@@ -347,7 +351,11 @@ export default {
     // --- Config API ---
     if (url.pathname === "/api/factory/config" && request.method === "POST") {
       if (
-        request.headers.get("x-titanium-api-secret") !== env.TITANIUM_API_SECRET
+        !(await timingSafeEqual(
+          request.headers.get("x-titanium-api-secret") || "",
+          env.TITANIUM_API_SECRET,
+          env.TITANIUM_API_SECRET,
+        ))
       ) {
         return new Response("Unauthorized", { status: 401 });
       }
@@ -384,7 +392,11 @@ export default {
     // --- Memory API ---
     if (url.pathname === "/api/factory/memory") {
       if (
-        request.headers.get("x-titanium-api-secret") !== env.TITANIUM_API_SECRET
+        !(await timingSafeEqual(
+          request.headers.get("x-titanium-api-secret") || "",
+          env.TITANIUM_API_SECRET,
+          env.TITANIUM_API_SECRET,
+        ))
       ) {
         return new Response("Unauthorized", { status: 401 });
       }
@@ -449,7 +461,11 @@ export default {
       request.method === "POST"
     ) {
       if (
-        request.headers.get("x-titanium-api-secret") !== env.TITANIUM_API_SECRET
+        !(await timingSafeEqual(
+          request.headers.get("x-titanium-api-secret") || "",
+          env.TITANIUM_API_SECRET,
+          env.TITANIUM_API_SECRET,
+        ))
       ) {
         return new Response("Unauthorized", { status: 401 });
       }
@@ -478,7 +494,11 @@ export default {
     // --- Sequences API ---
     if (url.pathname === "/api/factory/sequences") {
       if (
-        request.headers.get("x-titanium-api-secret") !== env.TITANIUM_API_SECRET
+        !(await timingSafeEqual(
+          request.headers.get("x-titanium-api-secret") || "",
+          env.TITANIUM_API_SECRET,
+          env.TITANIUM_API_SECRET,
+        ))
       ) {
         return new Response("Unauthorized", { status: 401 });
       }
@@ -518,7 +538,11 @@ export default {
     // --- Bots API ---
     if (url.pathname === "/api/factory/bots" && request.method === "GET") {
       if (
-        request.headers.get("x-titanium-api-secret") !== env.TITANIUM_API_SECRET
+        !(await timingSafeEqual(
+          request.headers.get("x-titanium-api-secret") || "",
+          env.TITANIUM_API_SECRET,
+          env.TITANIUM_API_SECRET,
+        ))
       ) {
         return new Response("Unauthorized", { status: 401 });
       }
@@ -530,7 +554,11 @@ export default {
 
     if (url.pathname.startsWith("/api/factory/bots/")) {
       if (
-        request.headers.get("x-titanium-api-secret") !== env.TITANIUM_API_SECRET
+        !(await timingSafeEqual(
+          request.headers.get("x-titanium-api-secret") || "",
+          env.TITANIUM_API_SECRET,
+          env.TITANIUM_API_SECRET,
+        ))
       ) {
         return new Response("Unauthorized", { status: 401 });
       }
@@ -591,7 +619,11 @@ export default {
       request.method === "POST"
     ) {
       if (
-        request.headers.get("x-titanium-api-secret") !== env.TITANIUM_API_SECRET
+        !(await timingSafeEqual(
+          request.headers.get("x-titanium-api-secret") || "",
+          env.TITANIUM_API_SECRET,
+          env.TITANIUM_API_SECRET,
+        ))
       ) {
         return new Response("Unauthorized", { status: 401 });
       }

@@ -4,7 +4,10 @@ import type { TitaniumSession } from "./types";
 export class RelationalSessionAdapter
   implements StorageAdapter<TitaniumSession>
 {
-  constructor(private db: D1Database) {}
+  constructor(
+    private db: D1Database,
+    private defaultPlatform: "telegram" | "whatsapp" = "telegram",
+  ) {}
 
   async read(key: string): Promise<TitaniumSession | undefined> {
     const [_, chatId, botId] = key.split(":");
@@ -32,7 +35,7 @@ export class RelationalSessionAdapter
     const step_data = JSON.stringify(value.step_data || {});
     const paso_actual = value.paso_actual || 0;
     const estado_flujo = value.estado_flujo || "activo";
-    const platform = "telegram"; // For now, handle platform in engine
+    const platform = value._titaniumPlatform || this.defaultPlatform;
     const expires_at = new Date(Date.now() + 24 * 3600 * 1000).toISOString();
 
     // Atomic update or insert using a transaction-safe pattern for D1

@@ -110,7 +110,7 @@ export async function handleWhatsAppWebhook(
     // Construct a minimal Context compatible with handleAgendadoUpdate
     const chatId = message.from;
     const sessionKey = `session:${chatId}:${bot.bot_id}`;
-    const sessionAdapter = new RelationalSessionAdapter(env.DB);
+    const sessionAdapter = new RelationalSessionAdapter(env.DB, "whatsapp");
     const session = await sessionAdapter.read(sessionKey);
 
     const waContext: FactoryContext = {
@@ -122,6 +122,7 @@ export async function handleWhatsAppWebhook(
       session: (session as TitaniumSession) || {
         step_data: {},
         paso_actual: 0,
+        _titaniumPlatform: "whatsapp",
       },
       chat: {
         id: Number.parseInt(chatId.replace(/\D/g, ""), 10) || 0,

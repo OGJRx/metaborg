@@ -41,6 +41,7 @@ export interface TitaniumSession extends Record<string, unknown> {
   _titaniumEnv?: CoreEnv;
   _titaniumBotId?: string;
   _titaniumHost?: string;
+  _titaniumPlatform?: "telegram" | "whatsapp";
   step_data?: Record<string, string>;
   paso_actual?: number;
   estado_flujo?: "iniciado" | "completado" | "confirmado" | "cancelado";

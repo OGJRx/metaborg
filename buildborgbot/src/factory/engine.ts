@@ -4,13 +4,13 @@ import {
   type VersionedState,
 } from "@grammyjs/conversations";
 import { D1Adapter } from "@grammyjs/storage-cloudflare";
-import { Bot, type Context, type StorageAdapter, session } from "grammy";
+import { Bot, type Context, MemorySessionStorage, type StorageAdapter, session } from "grammy";
 import type { Update } from "grammy/types";
 import { RelationalSessionAdapter } from "./adapter";
 import { setupBotFather } from "./botfather";
 import { assertNever, BotKindSetupRegistry, setupBot } from "./registry";
 import type { BotKind } from "./schemas";
-import { type CoreEnv, FACTORY_ENV_SYMBOL, type FactoryContext } from "./types";
+import { type CoreEnv, FACTORY_ENV_SYMBOL, type FactoryContext, type TitaniumSession } from "./types";
 
 // --- FACTORY ENGINE ---
 
@@ -129,20 +129,29 @@ async function setupBotMiddleware(
   bot.use(async (ctx, next) => {
     // Retrieve request-specific context from the update object
     const reqContext = ctx.update as unknown as {
-      [FACTORY_ENV_SYMBOL]: CoreEnv;
-      host: string;
-      waitUntil: (promise: Promise<unknown>) => void;
+      [FACTORY_ENV_SYMBOL]?: CoreEnv;
+      host?: string;
+      waitUntil?: (promise: Promise<unknown>) => void;
     };
-    ctx.env = reqContext[FACTORY_ENV_SYMBOL];
+
+    // Use closure-captured fallbacks if the update-based injection failed
+    // This is critical for conversation re-entries where grammY might clone the context/update
+    ctx.env = reqContext[FACTORY_ENV_SYMBOL] || env;
     ctx.botId = botId;
-    ctx.host = reqContext.host;
+    ctx.host = reqContext.host || _host;
     ctx.platform = "telegram";
-    ctx.waitUntil = reqContext.waitUntil;
+    ctx.waitUntil = reqContext.waitUntil || _waitUntil;
+
     await next();
   });
 
-  // Session storage (Relational Adapter for Titanium Core)
-  const sessionAdapter = new RelationalSessionAdapter(db);
+  // Session storage
+  // BotFather uses memory storage to avoid FK constraints (it's not in factory_bots table)
+  // All other bots use RelationalSessionAdapter
+  const sessionAdapter =
+    botId === "botfather"
+      ? new MemorySessionStorage<TitaniumSession>()
+      : new RelationalSessionAdapter(db);
 
   bot.use(
     session({
@@ -162,38 +171,16 @@ async function setupBotMiddleware(
       // non-serializable D1 bindings. handleUpdate already injects 'env' into ctx.update.
       ctx.session._titaniumBotId = ctx.botId;
       ctx.session._titaniumHost = ctx.host;
+      ctx.session._titaniumPlatform = ctx.platform;
     }
     await next();
   });
 
   // Conversation storage (using dedicated factory_conversations table)
-  // D1Adapter.create is async, so we might need a different approach for pure middleware setup
-  // if we want to avoid awaiting inside the setup.
-  // Actually, grammY allows async setup if we do it before the bot starts handling updates.
-
-  const convoAdapter: StorageAdapter<VersionedState<ConversationData>> = {
-    read: async (key) => {
-      const adapter = await D1Adapter.create<VersionedState<ConversationData>>(
-        db,
-        "factory_conversations",
-      );
-      return adapter.read(key);
-    },
-    write: async (key, value) => {
-      const adapter = await D1Adapter.create<VersionedState<ConversationData>>(
-        db,
-        "factory_conversations",
-      );
-      return adapter.write(key, value);
-    },
-    delete: async (key) => {
-      const adapter = await D1Adapter.create<VersionedState<ConversationData>>(
-        db,
-        "factory_conversations",
-      );
-      return adapter.delete(key);
-    },
-  };
+  const convoAdapter = await D1Adapter.create<VersionedState<ConversationData>>(
+    db,
+    "factory_conversations",
+  );
 
   bot.use(
     conversations({
