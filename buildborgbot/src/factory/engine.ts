@@ -154,10 +154,11 @@ async function setupBotMiddleware(
     }),
   );
 
-  // Post-session middleware to sync request context to session for conversation fallback
+  // Post-session middleware to sync request context to session metadata
   bot.use(async (ctx, next) => {
     if (ctx.session) {
-      ctx.session._titaniumEnv = ctx.env;
+      // We no longer store the entire 'env' in the session because it contains
+      // non-serializable D1 bindings. handleUpdate already injects 'env' into ctx.update.
       ctx.session._titaniumBotId = ctx.botId;
       ctx.session._titaniumHost = ctx.host;
     }

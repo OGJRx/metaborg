@@ -14,15 +14,15 @@ database_id = "61a5d89a-19d2-4851-9f5b-3f088b729d0c"
 
 [observability]
 enabled = true
-head_sampling_rate = 0.01
+head_sampling_rate = 1
 
 [observability.logs]
 enabled = true
-head_sampling_rate = 0.01
+head_sampling_rate = 1
 persist = true
 invocation_logs = true
 
 [observability.traces]
 enabled = true
 persist = true
-head_sampling_rate = 0.01
+head_sampling_rate = 1
