@@ -184,6 +184,91 @@ export const MenuSchema = z.array(
   }),
 );
 
+export const DEFAULT_AGENDADO_CONFIG: z.infer<typeof AgendadoConfigSchema> = {
+  business_identity: {
+    name: "Taller Mecánico",
+    welcome_message:
+      "🚗 <b>Bienvenido al Centro de Servicio</b>\n\nSoy tu asistente virtual. Estoy aquí para ayudarte a agendar tu cita de mantenimiento de manera rápida y sencilla.",
+    location_label: "Sede Principal",
+    location_maps_url: "https://maps.google.com",
+    protocol_message:
+      "📍 Te esperamos en nuestra sede. Recuerda llegar 15 minutos antes.",
+    cancel_message: "❌ Operación cancelada. Estamos a tu orden.",
+    confirm_message: `✅ <b>¡Cita confirmada!</b>\n\nTu ticket de atención es: <code>${"${"}ticketId}</code>`,
+    summary_header: "<b>📋 RESUMEN DE TU CITA</b>",
+    confirm_prompt: "\n¿Deseas confirmar estos datos?",
+    confirm_yes_label: "✅ Confirmar",
+    confirm_no_label: "❌ Cancelar",
+    invalid_input_message: "⚠️ Entrada no válida. Por favor, intenta de nuevo.",
+  },
+  scheduling: {
+    capacity_per_slot: 2,
+    slot_duration_minutes: 60,
+    booking_horizon_days: 14,
+    buffer_arrival_minutes: 15,
+  },
+  office_hours: {
+    work_days: [false, true, true, true, true, true, false],
+    open_hour: 8,
+    close_hour: 17,
+    timezone: "America/Caracas",
+  },
+  steps: [
+    {
+      id: "vehiculo",
+      type: "select",
+      label: "Tipo de Vehículo",
+      prompt: "Selecciona el tipo de vehículo:",
+      options: [
+        { label: "Sedán / Compacto", value: "sedan" },
+        { label: "Camioneta / SUV", value: "suv" },
+        { label: "Moto", value: "moto" },
+      ],
+    },
+    {
+      id: "motor",
+      type: "select",
+      label: "Tipo de Motor",
+      prompt: "¿Qué tipo de motor tiene su vehículo?",
+      options: [
+        { label: "Gasolina", value: "gasolina" },
+        { label: "Diesel", value: "diesel" },
+        { label: "Híbrido / Eléctrico", value: "electrico" },
+      ],
+    },
+    {
+      id: "servicio",
+      type: "select",
+      label: "Servicio",
+      prompt: "Selecciona el servicio requerido:",
+      options: [
+        { label: "Cambio de Aceite", value: "aceite" },
+        { label: "Frenos", value: "frenos" },
+        { label: "Diagnóstico Computarizado", value: "scanner" },
+        { label: "Mantenimiento Preventivo", value: "preventivo" },
+      ],
+    },
+    {
+      id: "fecha",
+      type: "date",
+      label: "Fecha",
+      prompt: "Selecciona el día de tu visita:",
+    },
+    {
+      id: "hora",
+      type: "time",
+      label: "Hora",
+      prompt: "Selecciona el horario disponible:",
+    },
+  ],
+  appointment_mapping: {
+    date_step_id: "fecha",
+    time_step_id: "hora",
+  },
+  cancel_keywords: ["cancelar", "salir", "abortar"],
+  help_keywords: ["ayuda", "reiniciar", "inicio"],
+};
+
 export const TelegramUpdateSchema = z
   .object({
     update_id: z.number(),

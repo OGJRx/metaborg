@@ -1,6 +1,7 @@
 import type { Conversation } from "@grammyjs/conversations";
 import { assertEnv } from "./guards";
 import { upsertBotConfig } from "./platform";
+import { DEFAULT_AGENDADO_CONFIG } from "./schemas";
 import type { FactoryContext } from "./types";
 
 type Convo = Conversation<FactoryContext, FactoryContext>;
@@ -103,7 +104,7 @@ export async function newBotConversation(
           bot_kind: botKind,
           config_json:
             botKind === "agendado"
-              ? "{}"
+              ? JSON.stringify(DEFAULT_AGENDADO_CONFIG)
               : JSON.stringify({
                   system_prompt: systemPrompt,
                   welcome_message: `¡Hola! Soy ${botName}. ¿En qué puedo ayudarte?`,
