@@ -1,7 +1,7 @@
 import type { Conversation } from "@grammyjs/conversations";
 import { assertEnv } from "./guards";
 import { upsertBotConfig } from "./platform";
-import { DEFAULT_AGENDADO_CONFIG } from "./schemas";
+import { GENERIC_AGENDADO_CONFIG, WORKSHOP_AGENDADO_CONFIG } from "./schemas";
 import type { FactoryContext } from "./types";
 
 type Convo = Conversation<FactoryContext, FactoryContext>;
@@ -19,7 +19,9 @@ export async function newBotConversation(
       reply_markup: new InlineKeyboard()
         .text("💬 Chat Abierto (IA)", "kind:open_chat")
         .row()
-        .text("📅 Agendado Genérico", "kind:agendado")
+        .text("📅 Agendado (Nuevo Negocio)", "kind:agendado")
+        .row()
+        .text("🚗 Taller Mecánico (Plantilla)", "kind:tpl_workshop")
         .row()
         .text("🛠️ Especialista (OBD/Partes)", "kind:tool_specialist"),
     },
@@ -28,10 +30,12 @@ export async function newBotConversation(
   const kindCtx = await conversation.waitForCallbackQuery(/^kind:/, {
     maxMilliseconds: 5 * 60 * 1000,
   });
-  const botKind = kindCtx.match[0].split(":")[1] as
-    | "open_chat"
-    | "agendado"
-    | "tool_specialist";
+  const selection = kindCtx.match[0].split(":")[1] || "open_chat";
+
+  const isAgendado = selection === "agendado" || selection === "tpl_workshop";
+  const botKind = isAgendado
+    ? "agendado"
+    : (selection as "open_chat" | "tool_specialist");
   await kindCtx.answerCallbackQuery();
 
   await kindCtx.reply("🆔 Ingresa el ID único del bot (slug):", {
@@ -73,7 +77,7 @@ export async function newBotConversation(
   const botToken = tokenCtx.message.text;
 
   let systemPrompt = "";
-  if (botKind !== "agendado") {
+  if (!isAgendado) {
     await tokenCtx.reply("📜 Ingresa el System Prompt (instrucciones de IA):", {
       parse_mode: "HTML",
     });
@@ -102,14 +106,17 @@ export async function newBotConversation(
           welcome_message: `¡Hola! Soy ${botName}. ¿En qué puedo ayudarte?`,
           menu_json: "[]",
           bot_kind: botKind,
-          config_json:
-            botKind === "agendado"
-              ? JSON.stringify(DEFAULT_AGENDADO_CONFIG)
-              : JSON.stringify({
-                  system_prompt: systemPrompt,
-                  welcome_message: `¡Hola! Soy ${botName}. ¿En qué puedo ayudarte?`,
-                  menu_json: "[]",
-                }),
+          config_json: isAgendado
+            ? JSON.stringify(
+                selection === "tpl_workshop"
+                  ? WORKSHOP_AGENDADO_CONFIG
+                  : GENERIC_AGENDADO_CONFIG,
+              )
+            : JSON.stringify({
+                system_prompt: systemPrompt,
+                welcome_message: `¡Hola! Soy ${botName}. ¿En qué puedo ayudarte?`,
+                menu_json: "[]",
+              }),
         },
         tokenCtx.host,
       ),

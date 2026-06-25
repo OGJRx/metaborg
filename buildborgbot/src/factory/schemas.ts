@@ -184,7 +184,7 @@ export const MenuSchema = z.array(
   }),
 );
 
-export const DEFAULT_AGENDADO_CONFIG: z.infer<typeof AgendadoConfigSchema> = {
+export const WORKSHOP_AGENDADO_CONFIG: z.infer<typeof AgendadoConfigSchema> = {
   business_identity: {
     name: "Taller Mecánico",
     welcome_message:
@@ -268,6 +268,61 @@ export const DEFAULT_AGENDADO_CONFIG: z.infer<typeof AgendadoConfigSchema> = {
   cancel_keywords: ["cancelar", "salir", "abortar"],
   help_keywords: ["ayuda", "reiniciar", "inicio"],
 };
+
+export const GENERIC_AGENDADO_CONFIG: z.infer<typeof AgendadoConfigSchema> = {
+  business_identity: {
+    name: "Nuevo Negocio",
+    welcome_message:
+      "📅 <b>Bienvenido al Sistema de Agendado</b>\n\nReserva tu cita de manera rápida y sencilla.",
+    cancel_message: "❌ Operación cancelada.",
+    confirm_message: `✅ <b>¡Cita confirmada!</b>\n\nTu ticket es: <code>${"${"}ticketId}</code>`,
+    summary_header: "<b>📋 RESUMEN DE CITA</b>",
+    confirm_prompt: "\n¿Deseas confirmar la cita?",
+    confirm_yes_label: "✅ Confirmar",
+    confirm_no_label: "❌ Cancelar",
+    invalid_input_message: "⚠️ Entrada no válida.",
+  },
+  scheduling: {
+    capacity_per_slot: 1,
+    slot_duration_minutes: 30,
+    booking_horizon_days: 7,
+    buffer_arrival_minutes: 0,
+  },
+  office_hours: {
+    work_days: [false, true, true, true, true, true, false],
+    open_hour: 9,
+    close_hour: 18,
+    timezone: "America/Caracas",
+  },
+  steps: [
+    {
+      id: "servicio",
+      type: "text",
+      label: "Servicio",
+      prompt: "¿Qué servicio solicita?",
+    },
+    {
+      id: "fecha",
+      type: "date",
+      label: "Fecha",
+      prompt: "Selecciona la fecha:",
+    },
+    {
+      id: "hora",
+      type: "time",
+      label: "Hora",
+      prompt: "Selecciona la hora:",
+    },
+  ],
+  appointment_mapping: {
+    date_step_id: "fecha",
+    time_step_id: "hora",
+  },
+  cancel_keywords: ["cancelar"],
+  help_keywords: ["ayuda", "inicio"],
+};
+
+export const DEFAULT_AGENDADO_CONFIG = GENERIC_AGENDADO_CONFIG;
 
 export const TelegramUpdateSchema = z
   .object({
