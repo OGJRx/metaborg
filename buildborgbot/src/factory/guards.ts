@@ -11,13 +11,18 @@ export function assertEnv(
       host?: string;
       waitUntil?: (promise: Promise<unknown>) => void;
     };
-    if (ext[FACTORY_ENV_SYMBOL]) ctx.env = ext[FACTORY_ENV_SYMBOL];
-    if (ext.botId) ctx.botId = ext.botId;
-    if (ext.host) ctx.host = ext.host;
-    if (ext.waitUntil) ctx.waitUntil = ext.waitUntil;
+    if (ext[FACTORY_ENV_SYMBOL]) {
+      ctx.env = ext[FACTORY_ENV_SYMBOL];
+      if (ext.botId) ctx.botId = ext.botId;
+      if (ext.host) ctx.host = ext.host;
+      if (ext.waitUntil) ctx.waitUntil = ext.waitUntil;
+    }
   }
 
-  // 2. Second priority: Metadata from session (for botId/host)
+  // 2. Second priority: Session persisted (survives waitFor re-entries)
+  if (ctx.session?._titaniumEnv && !ctx.env?.DB) {
+    ctx.env = ctx.session._titaniumEnv;
+  }
   if (ctx.session) {
     if (!ctx.botId && ctx.session._titaniumBotId)
       ctx.botId = ctx.session._titaniumBotId;

@@ -8,7 +8,12 @@ import { Bot, type Context, MemorySessionStorage, session } from "grammy";
 import type { Update } from "grammy/types";
 import { RelationalSessionAdapter } from "./adapter";
 import { setupBotFather } from "./botfather";
-import { assertNever, BotKindSetupRegistry, setupBot } from "./registry";
+import {
+  assertNever,
+  BotKindSetupRegistry,
+  setupBot,
+  setupOrphanBot,
+} from "./registry";
 import type { BotKind } from "./schemas";
 import {
   type CoreEnv,
@@ -141,7 +146,14 @@ async function setupBotMiddleware(
 
     // Use closure-captured fallbacks if the update-based injection failed
     // This is critical for conversation re-entries where grammY might clone the context/update
-    ctx.env = reqContext[FACTORY_ENV_SYMBOL] || env;
+    const injectedEnv = reqContext[FACTORY_ENV_SYMBOL];
+    ctx.env = injectedEnv || ctx.session?._titaniumEnv || env;
+
+    // Persist in session to survive waitFor re-entries in conversations
+    if (injectedEnv && ctx.session) {
+      ctx.session._titaniumEnv = injectedEnv;
+    }
+
     ctx.botId = botId;
     ctx.host = reqContext.host || _host;
     ctx.platform = "telegram";
@@ -219,8 +231,8 @@ async function setupBotMiddleware(
         assertNever(botRow.bot_kind as never);
       }
     } else {
-      // Fallback for bots not yet in factory_bots table or generic setup
-      setupBot(botId, bot);
+      // Bot not in DB or unrecognized kind — safe fallback, NO AI
+      setupOrphanBot(botId, bot);
     }
   }
 }

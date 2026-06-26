@@ -2,6 +2,7 @@ import type { Conversation } from "@grammyjs/conversations";
 import { assertEnv } from "./guards";
 import { upsertBotConfig } from "./platform";
 import { GENERIC_AGENDADO_CONFIG, WORKSHOP_AGENDADO_CONFIG } from "./schemas";
+import { getTemplate, listTemplates } from "./templates";
 import type { FactoryContext } from "./types";
 
 type Convo = Conversation<FactoryContext, FactoryContext>;
@@ -21,7 +22,9 @@ export async function newBotConversation(
         .row()
         .text("📅 Agendado (Nuevo Negocio)", "kind:agendado")
         .row()
-        .text("🚗 Taller Mecánico (Plantilla)", "kind:tpl_workshop")
+        .text("🚗 Taller Mecánico (Agendado)", "kind:tpl_workshop_agendado")
+        .row()
+        .text("🔧 Taller Mecánico (IA + OBD)", "kind:tpl_workshop_ai")
         .row()
         .text("🛠️ Especialista (OBD/Partes)", "kind:tool_specialist"),
     },
@@ -30,13 +33,60 @@ export async function newBotConversation(
   const kindCtx = await conversation.waitForCallbackQuery(/^kind:/, {
     maxMilliseconds: 5 * 60 * 1000,
   });
-  const selection = kindCtx.match[0].split(":")[1] || "open_chat";
 
-  const isAgendado = selection === "agendado" || selection === "tpl_workshop";
+  // Defense: extract selection directly from callback data, don't rely on regex match array in re-entries
+  const callbackData = kindCtx.callbackQuery?.data || "";
+  const selection = callbackData.replace(/^kind:/, "") || "open_chat";
+
+  const isAgendado =
+    selection === "agendado" || selection === "tpl_workshop_agendado";
+  const isFutureAI = selection === "tpl_workshop_ai";
   const botKind = isAgendado
     ? "agendado"
     : (selection as "open_chat" | "tool_specialist");
+
+  console.log(
+    JSON.stringify({
+      level: "info",
+      tag: "BOT_CREATION_KIND_SELECTED",
+      selection,
+      isAgendado,
+      botKind,
+      timestamp: new Date().toISOString(),
+    }),
+  );
   await kindCtx.answerCallbackQuery();
+
+  if (isFutureAI) {
+    await kindCtx.reply(
+      "⚠️ <b>PLANTILLA EN DESARROLLO</b>\n\nEl bot de Taller Mecánico con IA + OBD estará disponible en la próxima actualización. Por ahora, usa la opción de Taller Mecánico (Agendado).",
+      { parse_mode: "HTML" },
+    );
+    return;
+  }
+
+  let selectedTemplateId = "generic";
+  if (selection === "tpl_workshop_agendado") {
+    const templates = listTemplates();
+    const keyboard = new InlineKeyboard();
+    templates.forEach((t, i) => {
+      keyboard.text(t.name, `tmpl:${t.id}`);
+      if (i % 2 === 1) keyboard.row();
+    });
+    keyboard.row().text("GENÉRICO (Vacío)", "tmpl:generic");
+
+    await kindCtx.reply(
+      "📂 Selecciona la plantilla base para tu bot de agendado:",
+      { parse_mode: "HTML", reply_markup: keyboard },
+    );
+
+    const tmplCtx = await conversation.waitForCallbackQuery(/^tmpl:/, {
+      maxMilliseconds: 5 * 60 * 1000,
+    });
+    selectedTemplateId =
+      tmplCtx.callbackQuery?.data?.replace(/^tmpl:/, "") || "generic";
+    await tmplCtx.answerCallbackQuery();
+  }
 
   await kindCtx.reply("🆔 Ingresa el ID único del bot (slug):", {
     parse_mode: "HTML",
@@ -108,9 +158,7 @@ export async function newBotConversation(
           bot_kind: botKind,
           config_json: isAgendado
             ? JSON.stringify(
-                selection === "tpl_workshop"
-                  ? WORKSHOP_AGENDADO_CONFIG
-                  : GENERIC_AGENDADO_CONFIG,
+                getTemplate(selectedTemplateId) || GENERIC_AGENDADO_CONFIG,
               )
             : JSON.stringify({
                 system_prompt: systemPrompt,
