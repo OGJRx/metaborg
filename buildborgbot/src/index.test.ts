@@ -115,6 +115,9 @@ describe("Worker Entry Point", () => {
       config.bot_id,
       config.bot_name,
       config.token_var_name,
+      "", // system_prompt
+      "", // welcome_message
+      "[]", // menu_json
       config.bot_kind,
       config.config_json,
       "bot1-slug",

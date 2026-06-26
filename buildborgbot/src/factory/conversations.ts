@@ -1,8 +1,11 @@
 import type { Conversation } from "@grammyjs/conversations";
 import { assertEnv } from "./guards";
 import { upsertBotConfig } from "./platform";
-import { GENERIC_AGENDADO_CONFIG, WORKSHOP_AGENDADO_CONFIG } from "./schemas";
-import { getTemplate, listTemplates } from "./templates";
+import {
+  AGENT_PROMPTS,
+  GENERIC_AGENDADO_CONFIG,
+  WORKSHOP_AGENDADO_CONFIG,
+} from "./schemas";
 import type { FactoryContext } from "./types";
 
 type Convo = Conversation<FactoryContext, FactoryContext>;
@@ -13,6 +16,11 @@ export async function newBotConversation(
   conversation: Convo,
   ctx: FactoryContext,
 ): Promise<void> {
+  // Capture context properties early to survive waitFor re-entries
+  const capturedEnv = ctx.env;
+  const capturedHost = ctx.host;
+  const capturedBotId = ctx.botId;
+
   await ctx.reply(
     "🆕 <b>NUEVO BOT BORG</b>\n\nSelecciona el tipo de bot que deseas crear:",
     {
@@ -20,13 +28,11 @@ export async function newBotConversation(
       reply_markup: new InlineKeyboard()
         .text("💬 Chat Abierto (IA)", "kind:open_chat")
         .row()
-        .text("📅 Agendado (Nuevo Negocio)", "kind:agendado")
+        .text("📅 Agendado Nuevo", "kind:agendado_generic")
         .row()
-        .text("🚗 Taller Mecánico (Agendado)", "kind:tpl_workshop_agendado")
+        .text("🚗 Agendado Taller Mecánico", "kind:agendado_workshop")
         .row()
-        .text("🔧 Taller Mecánico (IA + OBD)", "kind:tpl_workshop_ai")
-        .row()
-        .text("🛠️ Especialista (OBD/Partes)", "kind:tool_specialist"),
+        .text("🔧 Especialista Taller (IA+OBD)", "kind:tool_specialist"),
     },
   );
 
@@ -39,11 +45,15 @@ export async function newBotConversation(
   const selection = callbackData.replace(/^kind:/, "") || "open_chat";
 
   const isAgendado =
-    selection === "agendado" || selection === "tpl_workshop_agendado";
-  const isFutureAI = selection === "tpl_workshop_ai";
+    selection === "agendado_generic" || selection === "agendado_workshop";
   const botKind = isAgendado
     ? "agendado"
     : (selection as "open_chat" | "tool_specialist");
+
+  const agendadoConfig =
+    selection === "agendado_workshop"
+      ? WORKSHOP_AGENDADO_CONFIG
+      : GENERIC_AGENDADO_CONFIG;
 
   console.log(
     JSON.stringify({
@@ -56,37 +66,6 @@ export async function newBotConversation(
     }),
   );
   await kindCtx.answerCallbackQuery();
-
-  if (isFutureAI) {
-    await kindCtx.reply(
-      "⚠️ <b>PLANTILLA EN DESARROLLO</b>\n\nEl bot de Taller Mecánico con IA + OBD estará disponible en la próxima actualización. Por ahora, usa la opción de Taller Mecánico (Agendado).",
-      { parse_mode: "HTML" },
-    );
-    return;
-  }
-
-  let selectedTemplateId = "generic";
-  if (selection === "tpl_workshop_agendado") {
-    const templates = listTemplates();
-    const keyboard = new InlineKeyboard();
-    templates.forEach((t, i) => {
-      keyboard.text(t.name, `tmpl:${t.id}`);
-      if (i % 2 === 1) keyboard.row();
-    });
-    keyboard.row().text("GENÉRICO (Vacío)", "tmpl:generic");
-
-    await kindCtx.reply(
-      "📂 Selecciona la plantilla base para tu bot de agendado:",
-      { parse_mode: "HTML", reply_markup: keyboard },
-    );
-
-    const tmplCtx = await conversation.waitForCallbackQuery(/^tmpl:/, {
-      maxMilliseconds: 5 * 60 * 1000,
-    });
-    selectedTemplateId =
-      tmplCtx.callbackQuery?.data?.replace(/^tmpl:/, "") || "generic";
-    await tmplCtx.answerCallbackQuery();
-  }
 
   await kindCtx.reply("🆔 Ingresa el ID único del bot (slug):", {
     parse_mode: "HTML",
@@ -121,30 +100,40 @@ export async function newBotConversation(
       parse_mode: "HTML",
     },
   );
-  const tokenCtx = await conversation.waitFor("message:text", {
+  const botTokenCtx = await conversation.waitFor("message:text", {
     maxMilliseconds: 5 * 60 * 1000,
   });
-  const botToken = tokenCtx.message.text;
+  const botToken = botTokenCtx.message.text;
 
   let systemPrompt = "";
-  if (!isAgendado) {
-    await tokenCtx.reply("📜 Ingresa el System Prompt (instrucciones de IA):", {
-      parse_mode: "HTML",
-    });
+  if (botKind === "open_chat") {
+    await botTokenCtx.reply(
+      "📜 Ingresa el System Prompt (instrucciones de IA):",
+      {
+        parse_mode: "HTML",
+      },
+    );
     const promptCtx = await conversation.waitFor("message:text", {
       maxMilliseconds: 5 * 60 * 1000,
     });
     systemPrompt = promptCtx.message.text;
+  } else if (botKind === "tool_specialist") {
+    systemPrompt = AGENT_PROMPTS.OBD_DIAGNOSTICO;
   }
 
-  await tokenCtx.reply("⏳ Procesando creación...");
+  await botTokenCtx.reply("⏳ Procesando creación...");
 
   try {
-    assertEnv(tokenCtx);
+    if (!capturedEnv?.DB || typeof capturedEnv.DB.prepare !== "function") {
+      throw new Error(
+        `[TITANIUM] Captured env lost DB binding (botId: ${capturedBotId}).`,
+      );
+    }
+
     const result = await conversation.external(() =>
       upsertBotConfig(
-        tokenCtx.env.DB,
-        tokenCtx.env,
+        capturedEnv.DB,
+        capturedEnv,
         {
           bot_id: botId,
           bot_name: botName,
@@ -153,20 +142,23 @@ export async function newBotConversation(
             .toUpperCase()
             .replace(/[^A-Z0-9]/g, "_")}`,
           system_prompt: systemPrompt,
-          welcome_message: `¡Hola! Soy ${botName}. ¿En qué puedo ayudarte?`,
+          welcome_message: isAgendado
+            ? agendadoConfig.business_identity.welcome_message
+            : `¡Hola! Soy ${botName}. ¿En qué puedo ayudarte?`,
           menu_json: "[]",
           bot_kind: botKind,
           config_json: isAgendado
-            ? JSON.stringify(
-                getTemplate(selectedTemplateId) || GENERIC_AGENDADO_CONFIG,
-              )
+            ? JSON.stringify(agendadoConfig)
             : JSON.stringify({
                 system_prompt: systemPrompt,
                 welcome_message: `¡Hola! Soy ${botName}. ¿En qué puedo ayudarte?`,
                 menu_json: "[]",
+                ...(botKind === "tool_specialist" && {
+                  lookup_source: "obd_db",
+                }),
               }),
         },
-        tokenCtx.host,
+        capturedHost,
       ),
     );
 
@@ -178,17 +170,17 @@ export async function newBotConversation(
         if (botKind === "agendado") {
           msg +=
             "\n\n⚙️ <b>CONFIGURACIÓN PENDIENTE:</b> Este bot de agendado requiere personalización (steps, horarios, etc). Usa el botón de abajo para abrir el editor visual.";
-          const webAppUrl = `https://${tokenCtx.host}/app/${botId}`;
+          const webAppUrl = `https://${capturedHost}/app/${botId}`;
           keyboard = new InlineKeyboard().webApp("🛠️ Abrir Editor", webAppUrl);
         }
 
         // @ts-expect-error - InlineKeyboard is compatible with reply_markup
-        await tokenCtx.reply(msg, {
+        await botTokenCtx.reply(msg, {
           parse_mode: "HTML",
           reply_markup: keyboard,
         });
       } else {
-        await tokenCtx.reply(
+        await botTokenCtx.reply(
           `⚠️ <b>BOT CREADO CON ADVERTENCIA</b>\n\nID: <code>${botId}</code>\n\nEl bot se registró correctamente pero el <b>webhook NO pudo configurarse</b>.\n\nError: <code>${result.webhook_error}</code>\n\nEl bot no recibirá mensajes hasta que se resuelva este problema. Puedes intentar actualizarlo nuevamente más tarde.`,
           {
             parse_mode: "HTML",
@@ -196,7 +188,7 @@ export async function newBotConversation(
         );
       }
     } else {
-      await tokenCtx.reply(
+      await botTokenCtx.reply(
         `❌ Error al crear bot: ${result.error ?? "Unknown error"}`,
       );
     }
@@ -210,7 +202,7 @@ export async function newBotConversation(
         timestamp: new Date().toISOString(),
       }),
     );
-    await tokenCtx.reply(`❌ Error crítico: ${String(err)}`);
+    await botTokenCtx.reply(`❌ Error crítico: ${String(err)}`);
   }
 }
 

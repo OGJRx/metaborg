@@ -8,12 +8,7 @@ import { Bot, type Context, MemorySessionStorage, session } from "grammy";
 import type { Update } from "grammy/types";
 import { RelationalSessionAdapter } from "./adapter";
 import { setupBotFather } from "./botfather";
-import {
-  assertNever,
-  BotKindSetupRegistry,
-  setupBot,
-  setupOrphanBot,
-} from "./registry";
+import { assertNever, BotKindSetupRegistry, setupOrphanBot } from "./registry";
 import type { BotKind } from "./schemas";
 import {
   type CoreEnv,
