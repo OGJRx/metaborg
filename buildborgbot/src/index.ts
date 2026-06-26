@@ -567,8 +567,8 @@ export default {
 
       if (request.method === "DELETE") {
         await env.DB.batch([
-          env.DB.prepare("DELETE FROM factory_sessions WHERE key LIKE ?").bind(
-            `${botId}:%`,
+          env.DB.prepare("DELETE FROM factory_sessions WHERE bot_id = ?").bind(
+            botId,
           ),
           env.DB.prepare(
             "DELETE FROM factory_callback_tokens WHERE bot_id = ?",

@@ -89,8 +89,8 @@ export function setupBotFather(_botId: string, bot: Bot<FactoryContext>) {
 
     await db.batch([
       db
-        .prepare("DELETE FROM factory_sessions WHERE key LIKE ?")
-        .bind(`${bot.bot_id}:%`),
+        .prepare("DELETE FROM factory_sessions WHERE bot_id = ?")
+        .bind(bot.bot_id),
       db
         .prepare("DELETE FROM factory_callback_tokens WHERE bot_id = ?")
         .bind(bot.bot_id),
