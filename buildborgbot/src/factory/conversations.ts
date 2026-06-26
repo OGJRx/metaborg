@@ -20,7 +20,6 @@ export async function newBotConversation(
   const capturedEnv = ctx.env;
   const capturedHost = ctx.host;
   const capturedBotId = ctx.botId;
-  const capturedWaitUntil = ctx.waitUntil;
 
   await ctx.reply(
     "🆕 <b>NUEVO BOT BORG</b>\n\nSelecciona el tipo de bot que deseas crear:",
@@ -108,9 +107,12 @@ export async function newBotConversation(
 
   let systemPrompt = "";
   if (botKind === "open_chat") {
-    await botTokenCtx.reply("📜 Ingresa el System Prompt (instrucciones de IA):", {
-      parse_mode: "HTML",
-    });
+    await botTokenCtx.reply(
+      "📜 Ingresa el System Prompt (instrucciones de IA):",
+      {
+        parse_mode: "HTML",
+      },
+    );
     const promptCtx = await conversation.waitFor("message:text", {
       maxMilliseconds: 5 * 60 * 1000,
     });
