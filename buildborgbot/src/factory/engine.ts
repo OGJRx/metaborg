@@ -139,6 +139,16 @@ async function setupBotMiddleware(
       waitUntil?: (promise: Promise<unknown>) => void;
     };
 
+    console.log(
+      JSON.stringify({
+        tag: "MW_INJECT",
+        botId,
+        hasSymbol: !!reqContext[FACTORY_ENV_SYMBOL],
+        hasFallback: !!env.DB,
+        timestamp: new Date().toISOString(),
+      }),
+    );
+
     // Use closure-captured fallbacks if the update-based injection failed
     // This is critical for conversation re-entries where grammY might clone the context/update
     const injectedEnv = reqContext[FACTORY_ENV_SYMBOL];

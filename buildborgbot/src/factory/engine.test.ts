@@ -6,22 +6,14 @@ import {
 } from "./handlers";
 import type { CoreEnv, FactoryContext } from "./types";
 
-const mockText = vi.fn().mockReturnValue("MOCKED_AI_RESPONSE");
-const mockGenerateContent = vi.fn().mockResolvedValue({
-  response: {
-    text: mockText,
-  },
+const mockText = "MOCKED_AI_RESPONSE";
+const mockGenerateAIResponse = vi.fn().mockResolvedValue({
+  text: mockText,
 });
 
-const mockGetGenerativeModel = vi.fn().mockReturnValue({
-  generateContent: mockGenerateContent,
-});
-
-vi.mock("@google/generative-ai", () => {
+vi.mock("./ai-client", () => {
   return {
-    GoogleGenerativeAI: class {
-      getGenerativeModel = mockGetGenerativeModel;
-    },
+    generateAIResponse: (...args: unknown[]) => mockGenerateAIResponse(...args),
   };
 });
 
@@ -105,7 +97,7 @@ describe("Engine Handlers Business Logic", () => {
       meta: { ...defaultMeta, last_row_id: 1 },
       results: [],
     });
-    mockText.mockReturnValue("MOCKED_AI_RESPONSE");
+    mockGenerateAIResponse.mockResolvedValue({ text: mockText });
   });
 
   describe("handleAction", () => {
@@ -273,7 +265,7 @@ describe("Engine Handlers Business Logic", () => {
         success: true,
         meta: defaultMeta,
       });
-      mockText.mockReturnValue("SUMMARY_TEXT");
+      mockGenerateAIResponse.mockResolvedValue({ text: "SUMMARY_TEXT" });
 
       vi.mocked(mockDbRaw.batch).mockResolvedValueOnce([]);
 

@@ -71,7 +71,7 @@ CREATE TABLE factory_tickets (
   id              INTEGER PRIMARY KEY AUTOINCREMENT,
   ticket_id       TEXT NOT NULL UNIQUE,      -- human-readable
   bot_id          TEXT NOT NULL REFERENCES factory_bots(bot_id) ON DELETE CASCADE,
-  session_id      TEXT NOT NULL REFERENCES factory_sessions(session_id),
+  session_id      TEXT,                      -- session_id is optional for tracking
   platform        TEXT NOT NULL,
   chat_id         TEXT NOT NULL,
   step_data       TEXT NOT NULL,             -- snapshot del step_data al confirmar

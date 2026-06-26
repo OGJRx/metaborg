@@ -1,4 +1,4 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { generateAIResponse } from "../ai-client";
 import type { FactoryContext } from "../types";
 
 export async function handleToolSpecialistUpdate(
@@ -23,18 +23,19 @@ export async function handleToolSpecialistUpdate(
   }
 
   try {
-    const genAI = new GoogleGenerativeAI(ctx.env.GEMINI_API_KEY);
-    const model = genAI.getGenerativeModel({
+    const result = await generateAIResponse(ctx.env.DB, {
+      botId: ctx.botId,
+      apiKey: ctx.env.GEMINI_API_KEY,
       model: ctx.env.AI_MODEL_NAME || "gemini-1.5-flash",
+      contents: [
+        {
+          role: "user",
+          parts: [{ text: prompt }, { text: `USUARIO: ${text}` }],
+        },
+      ],
     });
 
-    const result = await model.generateContent([
-      { text: prompt },
-      { text: `USUARIO: ${text}` },
-    ]);
-
-    const response = await result.response;
-    await ctx.reply(response.text());
+    await ctx.reply(result.text);
   } catch (e) {
     console.error("AI Error:", e);
     await ctx.reply("⚠️ Error procesando con IA.");

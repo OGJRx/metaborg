@@ -21,7 +21,7 @@
   },
   "homepage": "https://github.com/OGJRx/buildborgbot#readme",
   "dependencies": {
-    "@google/generative-ai": "^0.24.1",
+    "@google/genai": "^2.10.0",
     "@grammyjs/conversations": "^2.1.1",
     "@grammyjs/storage-cloudflare": "^2.4.2",
     "grammy": "^1.44.0",

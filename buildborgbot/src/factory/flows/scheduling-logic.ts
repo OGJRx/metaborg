@@ -5,26 +5,7 @@ export interface SlotValidationResult {
   errorCode?: string;
 }
 
-export function validateAppointmentSlot(
-  fecha: string,
-  hora: string,
-  workDays: boolean[],
-  bufferMinutes: number,
-  timezone: string,
-): SlotValidationResult {
-  const fParts = fecha.split("-").map(Number);
-  const _y = fParts[0] ?? 0;
-  const _m = fParts[1] ?? 0;
-  const _d = fParts[2] ?? 0;
-  const hParts = hora.split(":").map(Number);
-  const _hh = hParts[0] ?? 0;
-  const _mm = hParts[1] ?? 0;
-
-  // Use Intl to get offset or just use a Date with target timezone if environment supports it
-  // In Cloudflare Workers, we can use 'America/Caracas' etc.
-  const _tentativeDate = new Date(`${fecha}T${hora}:00`);
-
-  // Simple TZ check: get local time in target TZ
+export function getNowInTZ(timezone: string): Date {
   const formatter = new Intl.DateTimeFormat("en-US", {
     timeZone: timezone,
     year: "numeric",
@@ -43,7 +24,6 @@ export function validateAppointmentSlot(
     p[part.type] = part.value;
   }
 
-  // Current time in business timezone
   // biome-ignore lint/complexity/useLiteralKeys: required by tsconfig noPropertyAccessFromIndexSignature
   const year = p["year"];
   // biome-ignore lint/complexity/useLiteralKeys: required by tsconfig noPropertyAccessFromIndexSignature
@@ -57,9 +37,19 @@ export function validateAppointmentSlot(
   // biome-ignore lint/complexity/useLiteralKeys: required by tsconfig noPropertyAccessFromIndexSignature
   const second = (p["second"] ?? "0").padStart(2, "0");
 
-  const nowInTZ = new Date(
-    `${year}-${month}-${day}T${hour}:${minute}:${second}`,
-  );
+  // This returns a date whose components match the timezone's local time,
+  // even if the environment is in a different timezone (like UTC).
+  return new Date(`${year}-${month}-${day}T${hour}:${minute}:${second}`);
+}
+
+export function validateAppointmentSlot(
+  fecha: string,
+  hora: string,
+  workDays: boolean[],
+  bufferMinutes: number,
+  timezone: string,
+): SlotValidationResult {
+  const nowInTZ = getNowInTZ(timezone);
 
   // Buffer check
   const citaDate = new Date(`${fecha}T${hora}:00`);
@@ -133,7 +123,7 @@ export async function createTicketAtomic(
   db: D1Database,
   data: {
     botId: string;
-    sessionId: string;
+    sessionId?: string;
     platform: string;
     chatId: string;
     stepData: string;
@@ -154,7 +144,7 @@ export async function createTicketAtomic(
     .bind(
       ticketId,
       data.botId,
-      data.sessionId,
+      data.sessionId || null,
       data.platform,
       data.chatId,
       data.stepData,
