@@ -11,7 +11,6 @@ import { setupBotFather } from "./botfather";
 import {
   assertNever,
   BotKindSetupRegistry,
-  setupBot,
   setupOrphanBot,
 } from "./registry";
 import type { BotKind } from "./schemas";
