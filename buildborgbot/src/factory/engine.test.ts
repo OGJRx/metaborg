@@ -13,7 +13,7 @@ const mockGenerateAIResponse = vi.fn().mockResolvedValue({
 
 vi.mock("./ai-client", () => {
   return {
-    generateAIResponse: (...args: any[]) => mockGenerateAIResponse(...args),
+    generateAIResponse: (...args: unknown[]) => mockGenerateAIResponse(...args),
   };
 });
 

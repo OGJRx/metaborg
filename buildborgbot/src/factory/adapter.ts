@@ -48,11 +48,11 @@ export class RelationalSessionAdapter
           session_id, bot_id, platform, chat_id, paso_actual, step_data, estado_flujo, expires_at
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(bot_id, platform, chat_id, estado_flujo)
+        WHERE estado_flujo NOT IN ('confirmado','cancelado')
         DO UPDATE SET
           paso_actual = excluded.paso_actual,
           step_data = excluded.step_data,
-          updated_at = CURRENT_TIMESTAMP
-        WHERE estado_flujo NOT IN ('confirmado','cancelado')`,
+          updated_at = CURRENT_TIMESTAMP`,
       )
       .bind(
         session_id,

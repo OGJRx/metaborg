@@ -56,7 +56,7 @@ export async function generateAIResponse(
       const modelPromise = client.models.generateContent({
         model: request.model,
         contents: request.contents,
-        config: config as any,
+        config: config as unknown as Record<string, unknown>,
       });
 
       const result = await Promise.race([
@@ -75,7 +75,7 @@ export async function generateAIResponse(
       let text = "";
       try {
         text = response.text();
-      } catch (e) {
+      } catch (_e) {
         text = response.candidates?.[0]?.content?.parts?.[0]?.text || "";
       }
 
@@ -93,12 +93,15 @@ export async function generateAIResponse(
 
       await reportSuccess(db, request.botId);
       return { text };
-    } catch (err: any) {
+    } catch (err: unknown) {
       const error = err instanceof Error ? err : new Error(String(err));
       lastError = error;
 
       // Extract status code if available
-      const statusCode = err.status || err.statusCode || 0;
+      const statusCode =
+        (err as { status?: number; statusCode?: number })?.status ||
+        (err as { status?: number; statusCode?: number })?.statusCode ||
+        0;
       const errorMessage = error.message.toLowerCase();
 
       // Retryable errors: 429 (Rate Limit), 5xx (Server Error), Timeout, or specific demand errors
