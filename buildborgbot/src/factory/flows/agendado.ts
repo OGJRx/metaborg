@@ -290,20 +290,24 @@ async function getStepOptions(
     for (let i = 0; i <= horizon; i++) {
       const d = new Date(today);
       d.setDate(today.getDate() + i);
-      const iso = d.toISOString().split("T")[0];
+      const iso = d.toISOString().split("T")[0] ?? "";
       const dayOfWeek = d.getDay();
 
-      if (config.office_hours.work_days[dayOfWeek]) {
+      if (config.office_hours.work_days[dayOfWeek] && iso) {
         // Only include day if it has available slots
-        const slots = await validator.getAvailableSlots(ctx.botId, iso, {
-          capacity: config.scheduling.capacity_per_slot,
-          duration: config.scheduling.slot_duration_minutes,
-          openHour: config.office_hours.open_hour,
-          closeHour: config.office_hours.close_hour,
-          workDays: config.office_hours.work_days,
-          bufferMinutes: config.scheduling.buffer_arrival_minutes,
-          timezone: config.office_hours.timezone,
-        });
+        const slots = await validator.getAvailableSlots(
+          ctx.botId || "unknown",
+          iso,
+          {
+            capacity: config.scheduling.capacity_per_slot,
+            duration: config.scheduling.slot_duration_minutes,
+            openHour: config.office_hours.open_hour,
+            closeHour: config.office_hours.close_hour,
+            workDays: config.office_hours.work_days,
+            bufferMinutes: config.scheduling.buffer_arrival_minutes,
+            timezone: config.office_hours.timezone || "America/Caracas",
+          },
+        );
 
         if (slots.some((s) => s.available)) {
           options.push({ label: iso, value: iso });

@@ -24,12 +24,18 @@ export function getNowInTZ(timezone: string): Date {
     p[part.type] = part.value;
   }
 
-  const year = p.year;
-  const month = (p.month ?? "1").padStart(2, "0");
-  const day = (p.day ?? "1").padStart(2, "0");
-  const hour = (p.hour ?? "0").padStart(2, "0");
-  const minute = (p.minute ?? "0").padStart(2, "0");
-  const second = (p.second ?? "0").padStart(2, "0");
+  // biome-ignore lint/complexity/useLiteralKeys: required by tsconfig noPropertyAccessFromIndexSignature
+  const year = p["year"];
+  // biome-ignore lint/complexity/useLiteralKeys: required by tsconfig noPropertyAccessFromIndexSignature
+  const month = (p["month"] ?? "1").padStart(2, "0");
+  // biome-ignore lint/complexity/useLiteralKeys: required by tsconfig noPropertyAccessFromIndexSignature
+  const day = (p["day"] ?? "1").padStart(2, "0");
+  // biome-ignore lint/complexity/useLiteralKeys: required by tsconfig noPropertyAccessFromIndexSignature
+  const hour = (p["hour"] ?? "0").padStart(2, "0");
+  // biome-ignore lint/complexity/useLiteralKeys: required by tsconfig noPropertyAccessFromIndexSignature
+  const minute = (p["minute"] ?? "0").padStart(2, "0");
+  // biome-ignore lint/complexity/useLiteralKeys: required by tsconfig noPropertyAccessFromIndexSignature
+  const second = (p["second"] ?? "0").padStart(2, "0");
 
   // This returns a date whose components match the timezone's local time,
   // even if the environment is in a different timezone (like UTC).
