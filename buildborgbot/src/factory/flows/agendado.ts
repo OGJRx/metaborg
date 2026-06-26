@@ -2,7 +2,11 @@ import type { z } from "zod";
 import type { AgendadoConfigSchema, StepSchema } from "../schemas";
 import type { FactoryContext, TitaniumSession } from "../types";
 import { getRenderAdapter, type RenderAdapter } from "./render-adapter";
-import { createTicketAtomic, SlotValidator } from "./scheduling-logic";
+import {
+  createTicketAtomic,
+  getNowInTZ,
+  SlotValidator,
+} from "./scheduling-logic";
 
 type AgendadoConfig = z.infer<typeof AgendadoConfigSchema>;
 type Step = z.infer<typeof StepSchema>;
@@ -206,7 +210,6 @@ async function handleConfirmation(
 
   const res = await createTicketAtomic(ctx.env.DB, {
     botId: ctx.botId,
-    sessionId: `S-${ctx.chat?.id}-${Date.now()}`,
     platform,
     chatId: ctx.chat?.id.toString() || "unknown",
     stepData: JSON.stringify(session.step_data || {}),
@@ -281,14 +284,30 @@ async function getStepOptions(
   if (step.type === "date") {
     const horizon = config.scheduling.booking_horizon_days;
     const options = [];
-    const today = new Date(); // Ideally getVenezuelaNow()
-    for (let i = 1; i <= horizon; i++) {
+    const today = getNowInTZ(config.office_hours.timezone);
+    const validator = new SlotValidator(ctx.env.DB);
+
+    for (let i = 0; i <= horizon; i++) {
       const d = new Date(today);
       d.setDate(today.getDate() + i);
       const iso = d.toISOString().split("T")[0];
       const dayOfWeek = d.getDay();
+
       if (config.office_hours.work_days[dayOfWeek]) {
-        options.push({ label: iso, value: iso });
+        // Only include day if it has available slots
+        const slots = await validator.getAvailableSlots(ctx.botId, iso, {
+          capacity: config.scheduling.capacity_per_slot,
+          duration: config.scheduling.slot_duration_minutes,
+          openHour: config.office_hours.open_hour,
+          closeHour: config.office_hours.close_hour,
+          workDays: config.office_hours.work_days,
+          bufferMinutes: config.scheduling.buffer_arrival_minutes,
+          timezone: config.office_hours.timezone,
+        });
+
+        if (slots.some((s) => s.available)) {
+          options.push({ label: iso, value: iso });
+        }
       }
       if (options.length >= 10) break; // WhatsApp limit
     }
