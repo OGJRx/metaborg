@@ -239,6 +239,21 @@ export function setupAgendadoBot(
   try {
     const config = AgendadoConfigSchema.parse(JSON.parse(configJson));
 
+    // GUARD: Agendado bots must NEVER have AI processing
+    // If system_prompt is present in config, log warning
+    if (configJson.includes("system_prompt")) {
+      console.warn(
+        JSON.stringify({
+          level: "warn",
+          tag: "AGENDADO_AI_CONTAMINATION",
+          botId,
+          message:
+            "Agendado bot config contains AI-related fields. This is a configuration error.",
+          timestamp: new Date().toISOString(),
+        }),
+      );
+    }
+
     bot.on(["message", "callback_query"], async (ctx) => {
       await handleAgendadoUpdate(ctx, config);
     });
@@ -299,5 +314,44 @@ export function setupKernelAdminBot(
     await ctx.reply("🔧 Kernel Admin Bot — Pendiente de implementación", {
       parse_mode: "HTML",
     });
+  });
+}
+
+export function setupOrphanBot(botId: string, bot: Bot<FactoryContext>) {
+  console.log(
+    JSON.stringify({
+      level: "warn",
+      tag: "ORPHAN_BOT_FALLBACK",
+      botId,
+      message:
+        "Bot not found in factory_bots or has unknown bot_kind. Running safe fallback.",
+      timestamp: new Date().toISOString(),
+    }),
+  );
+
+  bot.command("start", async (ctx) => {
+    await ctx.reply(
+      "⚠️ Este bot no está configurado correctamente. Contacta al administrador de la fábrica.",
+      { parse_mode: "HTML" },
+    );
+  });
+
+  // Reject all messages — NO AI processing
+  bot.on("message:text", async (ctx) => {
+    await ctx.reply(
+      "⚠️ Bot sin configurar. Usa el comando /start para más información.",
+    );
+  });
+
+  bot.catch(async (err) => {
+    console.error(
+      JSON.stringify({
+        level: "error",
+        tag: "GRAMMY_ORPHAN_ERROR",
+        botId,
+        error: String(err),
+        timestamp: new Date().toISOString(),
+      }),
+    );
   });
 }
