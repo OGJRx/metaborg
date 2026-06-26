@@ -16,11 +16,6 @@ export async function newBotConversation(
   conversation: Convo,
   ctx: FactoryContext,
 ): Promise<void> {
-  // Capture context properties early to survive waitFor re-entries
-  const capturedEnv = ctx.env;
-  const capturedHost = ctx.host;
-  const capturedBotId = ctx.botId;
-
   await ctx.reply(
     "🆕 <b>NUEVO BOT BORG</b>\n\nSelecciona el tipo de bot que deseas crear:",
     {
@@ -124,16 +119,13 @@ export async function newBotConversation(
   await botTokenCtx.reply("⏳ Procesando creación...");
 
   try {
-    if (!capturedEnv?.DB || typeof capturedEnv.DB.prepare !== "function") {
-      throw new Error(
-        `[TITANIUM] Captured env lost DB binding (botId: ${capturedBotId}).`,
-      );
-    }
+    // Assert environment on the latest context to ensure live bindings
+    assertEnv(botTokenCtx);
 
     const result = await conversation.external(() =>
       upsertBotConfig(
-        capturedEnv.DB,
-        capturedEnv,
+        botTokenCtx.env.DB,
+        botTokenCtx.env,
         {
           bot_id: botId,
           bot_name: botName,
@@ -158,7 +150,7 @@ export async function newBotConversation(
                 }),
               }),
         },
-        capturedHost,
+        botTokenCtx.host,
       ),
     );
 
@@ -170,7 +162,7 @@ export async function newBotConversation(
         if (botKind === "agendado") {
           msg +=
             "\n\n⚙️ <b>CONFIGURACIÓN PENDIENTE:</b> Este bot de agendado requiere personalización (steps, horarios, etc). Usa el botón de abajo para abrir el editor visual.";
-          const webAppUrl = `https://${capturedHost}/app/${botId}`;
+          const webAppUrl = `https://${botTokenCtx.host}/app/${botId}`;
           keyboard = new InlineKeyboard().webApp("🛠️ Abrir Editor", webAppUrl);
         }
 
@@ -202,7 +194,7 @@ export async function newBotConversation(
         timestamp: new Date().toISOString(),
       }),
     );
-    await botTokenCtx.reply(`❌ Error crítico: ${String(err)}`);
+    await botTokenCtx.reply(`❌ Error crítico: ${String(err)}`).catch(() => {});
   }
 }
 
