@@ -32,6 +32,17 @@ export function assertEnv(
 
   // 3. Validation: The DB binding must be present AND functional
   if (!ctx.env?.DB) {
+    console.error(
+      JSON.stringify({
+        level: "error",
+        tag: "ENV_ASSERTION_FAILED",
+        botId: ctx.botId ?? "unknown",
+        hasUpdate: !!ctx.update,
+        hasSession: !!ctx.session,
+        sessionHasEnv: !!ctx.session?._titaniumEnv,
+        timestamp: new Date().toISOString(),
+      }),
+    );
     throw new Error(
       `[TITANIUM] Context lost 'env' property (botId: ${ctx.botId ?? "unknown"}).`,
     );

@@ -125,12 +125,15 @@ export async function upsertBotConfig(
   }
   await db
     .prepare(
-      "INSERT INTO factory_bots (bot_id, bot_name, token_var_name, bot_kind, config_json, slug, webhook_secret, token, token_iv, stack_id, owner_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(bot_id) DO UPDATE SET bot_name=excluded.bot_name, token_var_name=excluded.token_var_name, bot_kind=excluded.bot_kind, config_json=excluded.config_json, token=excluded.token, token_iv=excluded.token_iv, stack_id=excluded.stack_id, owner_id=excluded.owner_id, updated_at=CURRENT_TIMESTAMP",
+      "INSERT INTO factory_bots (bot_id, bot_name, token_var_name, system_prompt, welcome_message, menu_json, bot_kind, config_json, slug, webhook_secret, token, token_iv, stack_id, owner_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(bot_id) DO UPDATE SET bot_name=excluded.bot_name, token_var_name=excluded.token_var_name, system_prompt=excluded.system_prompt, welcome_message=excluded.welcome_message, menu_json=excluded.menu_json, bot_kind=excluded.bot_kind, config_json=excluded.config_json, token=excluded.token, token_iv=excluded.token_iv, stack_id=excluded.stack_id, owner_id=excluded.owner_id, updated_at=CURRENT_TIMESTAMP",
     )
     .bind(
       validated.bot_id,
       validated.bot_name,
       validated.token_var_name,
+      validated.system_prompt,
+      validated.welcome_message,
+      validated.menu_json,
       validated.bot_kind,
       validated.config_json,
       slug,
