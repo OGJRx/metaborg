@@ -208,8 +208,16 @@ async function handleConfirmation(
   const horaCita =
     timeStepId && session.step_data ? session.step_data[timeStepId] : null;
 
+  // Retrieve active sessionId for the ticket
+  const sessionRow = await ctx.env.DB.prepare(
+    "SELECT session_id FROM factory_sessions WHERE bot_id = ? AND chat_id = ? AND estado_flujo = 'activo' LIMIT 1",
+  )
+    .bind(ctx.botId, ctx.chat?.id.toString() || "unknown")
+    .first<{ session_id: string }>();
+
   const res = await createTicketAtomic(ctx.env.DB, {
     botId: ctx.botId,
+    sessionId: sessionRow?.session_id,
     platform,
     chatId: ctx.chat?.id.toString() || "unknown",
     stepData: JSON.stringify(session.step_data || {}),

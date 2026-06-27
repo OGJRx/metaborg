@@ -132,6 +132,12 @@ export async function createTicketAtomic(
     capacity: number;
   },
 ): Promise<{ success: boolean; ticketId?: string }> {
+  if (!data.sessionId) {
+    console.warn(
+      `[TITANIUM] createTicketAtomic: Missing sessionId for bot ${data.botId} (chatId: ${data.chatId})`,
+    );
+  }
+
   const ticketId =
     `T-${Date.now()}-${crypto.randomUUID().slice(0, 4)}`.toUpperCase();
 
