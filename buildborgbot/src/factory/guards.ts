@@ -1,28 +1,16 @@
-import { type CoreEnv, FACTORY_ENV_SYMBOL, type FactoryContext } from "./types";
+import { getUpdateEnv } from "./engine";
+import type { FactoryContext } from "./types";
 
 export function assertEnv(
   ctx: FactoryContext,
 ): asserts ctx is FactoryContext & { env: NonNullable<FactoryContext["env"]> } {
-  // 1. First priority: Always check the update object, where we inject the REAL env
-  if (ctx.update) {
-    const ext = ctx.update as unknown as {
-      [FACTORY_ENV_SYMBOL]?: CoreEnv;
-      botId?: string;
-      host?: string;
-      waitUntil?: (promise: Promise<unknown>) => void;
-    };
-    if (ext[FACTORY_ENV_SYMBOL]) {
-      ctx.env = ext[FACTORY_ENV_SYMBOL];
-      if (ext.botId) ctx.botId = ext.botId;
-      if (ext.host) ctx.host = ext.host;
-      if (ext.waitUntil) ctx.waitUntil = ext.waitUntil;
-    }
+  // 1. First priority: Always check the WeakMap via engine helper
+  const updateEnv = getUpdateEnv(ctx.update);
+  if (updateEnv) {
+    ctx.env = updateEnv;
   }
 
-  // 2. Second priority: Session persisted (survives waitFor re-entries)
-  if (ctx.session?._titaniumEnv && !ctx.env?.DB) {
-    ctx.env = ctx.session._titaniumEnv;
-  }
+  // 2. Second priority: Context property (might be already set by middleware)
   if (ctx.session) {
     if (!ctx.botId && ctx.session._titaniumBotId)
       ctx.botId = ctx.session._titaniumBotId;
@@ -39,7 +27,6 @@ export function assertEnv(
         botId: ctx.botId ?? "unknown",
         hasUpdate: !!ctx.update,
         hasSession: !!ctx.session,
-        sessionHasEnv: !!ctx.session?._titaniumEnv,
         timestamp: new Date().toISOString(),
       }),
     );

@@ -15,5 +15,10 @@
     "formatWithErrors": false,
     "indentStyle": "space",
     "indentWidth": 2
+  },
+  "vcs": {
+    "enabled": true,
+    "clientKind": "git",
+    "useIgnoreFile": true
   }
 }

@@ -10,16 +10,19 @@ import { RelationalSessionAdapter } from "./adapter";
 import { setupBotFather } from "./botfather";
 import { assertNever, BotKindSetupRegistry, setupOrphanBot } from "./registry";
 import type { BotKind } from "./schemas";
-import {
-  type CoreEnv,
-  FACTORY_ENV_SYMBOL,
-  type FactoryContext,
-  type TitaniumSession,
-} from "./types";
+import type { CoreEnv, FactoryContext, TitaniumSession } from "./types";
 
 // --- FACTORY ENGINE ---
 
-const botCache = new Map<string, Bot<FactoryContext>>();
+// Use WeakRef to allow GC of old bot instances while keeping them cached for performance
+const botCache = new Map<string, WeakRef<Bot<FactoryContext>>>();
+
+// Map incoming updates to their respective environments without polluting the Update object with Symbols
+const updateEnvMap = new WeakMap<Update, CoreEnv>();
+
+export function getUpdateEnv(update: Update): CoreEnv | undefined {
+  return updateEnvMap.get(update);
+}
 
 export async function handleUpdate(
   botId: string,
@@ -77,11 +80,12 @@ export async function handleUpdate(
     supports_join_request_queries: false,
   };
 
-  let bot = botCache.get(botId);
+  const botRef = botCache.get(botId);
+  let bot = botRef?.deref();
 
   if (!bot) {
     bot = new Bot<FactoryContext>(token, { botInfo });
-    botCache.set(botId, bot);
+    botCache.set(botId, new WeakRef(bot));
 
     await setupBotMiddleware(bot, botId, env, waitUntil, host);
   }
@@ -91,12 +95,11 @@ export async function handleUpdate(
   const currentHost = host;
   const currentWaitUntil = waitUntil;
 
-  // Attach env/botId/host/waitUntil to update for conversations plugin
-  // Grammy's conversations creates new Context for waitFor() without running middleware
-  // Mutating the update ensures the new ctx.update.env/botId are available
-  // We use FACTORY_ENV_SYMBOL to prevent D1 bindings from being serialized into sessions
+  // Store env in WeakMap associated with the update object
+  updateEnvMap.set(update, currentEnv);
+
+  // Attach other metadata to update (safe as they are serializable or just strings)
   Object.assign(update, {
-    [FACTORY_ENV_SYMBOL]: currentEnv,
     botId: currentBotId,
     host: currentHost,
     waitUntil: currentWaitUntil,
@@ -115,8 +118,6 @@ export async function handleUpdate(
         timestamp: new Date().toISOString(),
       }),
     );
-    // Even if it fails, we usually want to return 200 to Telegram unless we want them to retry
-    // For MVP, let's just return 200 and rely on logs.
   }
 
   return new Response("OK");
@@ -132,33 +133,25 @@ async function setupBotMiddleware(
   const db = env.DB;
 
   bot.use(async (ctx, next) => {
-    // Retrieve request-specific context from the update object
+    // Retrieve request-specific context from the update object or WeakMap
     const reqContext = ctx.update as unknown as {
-      [FACTORY_ENV_SYMBOL]?: CoreEnv;
       host?: string;
       waitUntil?: (promise: Promise<unknown>) => void;
     };
+
+    const injectedEnv = updateEnvMap.get(ctx.update);
 
     console.log(
       JSON.stringify({
         tag: "MW_INJECT",
         botId,
-        hasSymbol: !!reqContext[FACTORY_ENV_SYMBOL],
+        hasInjectedEnv: !!injectedEnv,
         hasFallback: !!env.DB,
         timestamp: new Date().toISOString(),
       }),
     );
 
-    // Use closure-captured fallbacks if the update-based injection failed
-    // This is critical for conversation re-entries where grammY might clone the context/update
-    const injectedEnv = reqContext[FACTORY_ENV_SYMBOL];
-    ctx.env = injectedEnv || ctx.session?._titaniumEnv || env;
-
-    // Persist in session to survive waitFor re-entries in conversations
-    if (injectedEnv && ctx.session) {
-      ctx.session._titaniumEnv = injectedEnv;
-    }
-
+    ctx.env = injectedEnv || env;
     ctx.botId = botId;
     ctx.host = reqContext.host || _host;
     ctx.platform = "telegram";
@@ -168,8 +161,6 @@ async function setupBotMiddleware(
   });
 
   // Session storage
-  // BotFather uses memory storage to avoid FK constraints (it's not in factory_bots table)
-  // All other bots use RelationalSessionAdapter
   const sessionAdapter =
     botId === "botfather"
       ? new MemorySessionStorage<TitaniumSession>()
@@ -186,11 +177,8 @@ async function setupBotMiddleware(
     }),
   );
 
-  // Post-session middleware to sync request context to session metadata
   bot.use(async (ctx, next) => {
     if (ctx.session) {
-      // We no longer store the entire 'env' in the session because it contains
-      // non-serializable D1 bindings. handleUpdate already injects 'env' into ctx.update.
       ctx.session._titaniumBotId = ctx.botId;
       ctx.session._titaniumHost = ctx.host;
       ctx.session._titaniumPlatform = ctx.platform;
@@ -198,7 +186,6 @@ async function setupBotMiddleware(
     await next();
   });
 
-  // Conversation storage (using dedicated factory_conversations table)
   const convoAdapter = await D1Adapter.create<VersionedState<ConversationData>>(
     db,
     "factory_conversations",
@@ -220,7 +207,6 @@ async function setupBotMiddleware(
   if (botId === "botfather") {
     setupBotFather(botId, bot);
   } else {
-    // Lookup bot_kind to decide setup during initialization
     const botRow = await db
       .prepare(
         "SELECT bot_kind, config_json FROM factory_bots WHERE bot_id = ?",
@@ -236,7 +222,6 @@ async function setupBotMiddleware(
         assertNever(botRow.bot_kind as never);
       }
     } else {
-      // Bot not in DB or unrecognized kind — safe fallback, NO AI
       setupOrphanBot(botId, bot);
     }
   }

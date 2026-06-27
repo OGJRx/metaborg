@@ -101,6 +101,8 @@ export async function newBotConversation(
   const botToken = botTokenCtx.message.text;
 
   let systemPrompt = "";
+  let liveCtx = botTokenCtx;
+
   if (botKind === "open_chat") {
     await botTokenCtx.reply(
       "📜 Ingresa el System Prompt (instrucciones de IA):",
@@ -112,20 +114,21 @@ export async function newBotConversation(
       maxMilliseconds: 5 * 60 * 1000,
     });
     systemPrompt = promptCtx.message.text;
+    liveCtx = promptCtx;
   } else if (botKind === "tool_specialist") {
     systemPrompt = AGENT_PROMPTS.OBD_DIAGNOSTICO;
   }
 
-  await botTokenCtx.reply("⏳ Procesando creación...");
+  await liveCtx.reply("⏳ Procesando creación...");
 
   try {
     // Assert environment on the latest context to ensure live bindings
-    assertEnv(botTokenCtx);
+    assertEnv(liveCtx);
 
     const result = await conversation.external(() =>
       upsertBotConfig(
-        botTokenCtx.env.DB,
-        botTokenCtx.env,
+        liveCtx.env.DB,
+        liveCtx.env,
         {
           bot_id: botId,
           bot_name: botName,
@@ -162,17 +165,17 @@ export async function newBotConversation(
         if (botKind === "agendado") {
           msg +=
             "\n\n⚙️ <b>CONFIGURACIÓN PENDIENTE:</b> Este bot de agendado requiere personalización (steps, horarios, etc). Usa el botón de abajo para abrir el editor visual.";
-          const webAppUrl = `https://${botTokenCtx.host}/app/${botId}`;
+          const webAppUrl = `https://${liveCtx.host}/app/${botId}`;
           keyboard = new InlineKeyboard().webApp("🛠️ Abrir Editor", webAppUrl);
         }
 
         // @ts-expect-error - InlineKeyboard is compatible with reply_markup
-        await botTokenCtx.reply(msg, {
+        await liveCtx.reply(msg, {
           parse_mode: "HTML",
           reply_markup: keyboard,
         });
       } else {
-        await botTokenCtx.reply(
+        await liveCtx.reply(
           `⚠️ <b>BOT CREADO CON ADVERTENCIA</b>\n\nID: <code>${botId}</code>\n\nEl bot se registró correctamente pero el <b>webhook NO pudo configurarse</b>.\n\nError: <code>${result.webhook_error}</code>\n\nEl bot no recibirá mensajes hasta que se resuelva este problema. Puedes intentar actualizarlo nuevamente más tarde.`,
           {
             parse_mode: "HTML",
@@ -180,7 +183,7 @@ export async function newBotConversation(
         );
       }
     } else {
-      await botTokenCtx.reply(
+      await liveCtx.reply(
         `❌ Error al crear bot: ${result.error ?? "Unknown error"}`,
       );
     }
@@ -194,7 +197,7 @@ export async function newBotConversation(
         timestamp: new Date().toISOString(),
       }),
     );
-    await botTokenCtx.reply(`❌ Error crítico: ${String(err)}`).catch(() => {});
+    await liveCtx.reply(`❌ Error crítico: ${String(err)}`).catch(() => {});
   }
 }
 
