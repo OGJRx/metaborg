@@ -60,6 +60,11 @@
       "version": "12",
       "name": "0011_journal_repair.sql",
       "checksum": "9d810df8e9d12cc3b9150d4170107e28379df895"
+    },
+    {
+      "version": "13",
+      "name": "0012_create_factory_obd_codes.sql",
+      "checksum": "faa6e05b107fbe2c1ea73b9ed15a2b6311756e56"
     }
   ]
 }

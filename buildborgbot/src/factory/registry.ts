@@ -85,7 +85,6 @@ export function setupBot(
     }
 
     await ctx.reply(config.welcome_message, {
-      parse_mode: "HTML",
       reply_markup: keyboard,
     });
 
@@ -103,7 +102,6 @@ export function setupBot(
 
     if (replyKeyboard.keyboard.length > 0) {
       await ctx.reply("Accediendo al menú...", {
-        parse_mode: "HTML",
         reply_markup: replyKeyboard,
       });
     }
@@ -204,8 +202,8 @@ export function setupBot(
     const keyboard = new InlineKeyboard().text("⚡ PROCESAR", cb);
 
     await ctx.reply(
-      `<b>ENTRADA RECIBIDA</b>\n\n<code>CONTENIDO:</code> <i>"${text.substring(0, 100)}${text.length > 100 ? "..." : ""}"</i>\n\n¿Desea procesar este mensaje con IA?`,
-      { parse_mode: "HTML", reply_markup: keyboard },
+      `ENTRADA RECIBIDA\n\nCONTENIDO: "${text.substring(0, 100)}${text.length > 100 ? "..." : ""}"\n\n¿Desea procesar este mensaje con IA?`,
+      { reply_markup: keyboard },
     );
   });
 

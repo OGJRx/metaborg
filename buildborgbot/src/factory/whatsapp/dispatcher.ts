@@ -113,10 +113,9 @@ export async function handleWhatsAppWebhook(
     const sessionAdapter = new RelationalSessionAdapter(env.DB, "whatsapp");
     const session = await sessionAdapter.read(sessionKey);
 
-    const waContext: FactoryContext = {
+    const waContext: Partial<FactoryContext> = {
       botId: bot.bot_id,
       env,
-      host: "unknown",
       platform: "whatsapp",
       waitUntil: (p: Promise<unknown>) => ctx.waitUntil(p),
       session: (session as TitaniumSession) || {
@@ -127,6 +126,7 @@ export async function handleWhatsAppWebhook(
       chat: {
         id: Number.parseInt(chatId.replace(/\D/g, ""), 10) || 0,
         type: "private",
+        first_name: "WA User",
       },
       from: {
         id: Number.parseInt(chatId.replace(/\D/g, ""), 10) || 0,
@@ -134,24 +134,32 @@ export async function handleWhatsAppWebhook(
         is_bot: false,
       },
       message: message.text
-        ? ({ text: message.text.body } as unknown as FactoryContext["message"])
+        ? ({
+            message_id: 0,
+            date: Math.floor(Date.now() / 1000),
+            chat: { id: 0, type: "private" },
+            text: message.text.body,
+          } as FactoryContext["message"])
         : undefined,
       callbackQuery: message.interactive
         ? ({
+            id: "0",
+            from: { id: 0, first_name: "WA", is_bot: false },
+            chat_instance: "0",
             data:
               message.interactive.button_reply?.id ||
               message.interactive.list_reply?.id,
-          } as unknown as FactoryContext["callbackQuery"])
+          } as FactoryContext["callbackQuery"])
         : undefined,
-      reply: async (text: string) => {
+      reply: (async (text: string) => {
         await sendWhatsAppMessage(phoneNumberId, decryptedToken, {
           messaging_product: "whatsapp",
           to: chatId,
           type: "text",
           text: { body: text },
         });
-        return {} as never;
-      },
+        return { message_id: 0 } as never;
+      }) as FactoryContext["reply"],
       replyInteractiveButtons: async (
         body: string,
         buttons: { id: string; title: string }[],
@@ -168,7 +176,7 @@ export async function handleWhatsAppWebhook(
             },
           },
         });
-        return {} as never;
+        return { message_id: 0 } as never;
       },
       replyInteractiveList: async (
         body: string,
@@ -187,31 +195,34 @@ export async function handleWhatsAppWebhook(
             body: { text: body },
             action: {
               button,
-              sections: sections as unknown as Record<string, unknown>[],
+              sections: sections as Record<string, unknown>[],
             },
           },
         });
-        return {} as never;
+        return { message_id: 0 } as never;
       },
-      hasCommand: (cmd: string) => message.text?.body === `/${cmd}`,
-    } as unknown as FactoryContext;
+      hasCommand: ((cmd: string) =>
+        message.text?.body === `/${cmd}`) as FactoryContext["hasCommand"],
+    };
 
-    await handleAgendadoUpdate(waContext, config);
+    await handleAgendadoUpdate(waContext as FactoryContext, config);
 
     // Persist session
     ctx.waitUntil(
-      sessionAdapter.write(sessionKey, waContext.session).catch((err) => {
-        console.error(
-          JSON.stringify({
-            level: "error",
-            tag: "WHATSAPP_SESSION_WRITE_FAILED",
-            botId: bot.bot_id,
-            chatId,
-            error: String(err),
-            timestamp: new Date().toISOString(),
-          }),
-        );
-      }),
+      sessionAdapter
+        .write(sessionKey, waContext.session as TitaniumSession)
+        .catch((err) => {
+          console.error(
+            JSON.stringify({
+              level: "error",
+              tag: "WHATSAPP_SESSION_WRITE_FAILED",
+              botId: bot.bot_id,
+              chatId,
+              error: String(err),
+              timestamp: new Date().toISOString(),
+            }),
+          );
+        }),
     );
   }
 
