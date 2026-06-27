@@ -1,0 +1,23 @@
+# Dependencias y builds
+node_modules/
+
+# Variables de entorno y logs
+.env
+.env.local
+.env.development
+.env.test
+.env.production
+*.log
+
+# Directorios de cache y configuración
+dist/
+.idea/
+.DS_Store
+
+# Directorios específicos del proyecto
+.wrangler/
+
+# Cache de herramientas varias
+.cache/
+.parcel-cache/
+.next/
