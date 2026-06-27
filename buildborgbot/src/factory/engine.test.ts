@@ -193,10 +193,7 @@ describe("Engine Handlers Business Logic", () => {
       const promise = vi.mocked(mockCtx.waitUntil).mock.calls[0]?.[0];
       await promise;
 
-      expect(mockCtx.reply).toHaveBeenCalledWith(
-        "MOCKED_AI_RESPONSE",
-        expect.objectContaining({ parse_mode: "HTML" }),
-      );
+      expect(mockCtx.reply).toHaveBeenCalledWith("MOCKED_AI_RESPONSE");
       expect(mockDbRaw.prepare).toHaveBeenCalledWith(
         expect.stringContaining("INSERT INTO factory_messages"),
       );

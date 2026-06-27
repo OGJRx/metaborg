@@ -86,7 +86,11 @@ export const AgendadoConfigSchema = z.object({
 });
 
 export const OpenChatConfigSchema = z.object({
-  system_prompt: z.string(),
+  system_prompt: z
+    .string()
+    .default(
+      "Responde SIEMPRE en texto plano. Prohibido usar HTML, Markdown, asteriscos, hashtags, backticks o cualquier formato.",
+    ),
   welcome_message: z.string(),
   menu_json: z.string(),
 });

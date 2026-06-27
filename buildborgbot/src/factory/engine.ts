@@ -19,6 +19,10 @@ const botCache = new Map<string, WeakRef<Bot<FactoryContext>>>();
 
 // Map incoming updates to their respective environments without polluting the Update object with Symbols
 const updateEnvMap = new WeakMap<Update, CoreEnv>();
+const updateContextMap = new WeakMap<
+  Update,
+  { botId: string; waitUntil: (p: Promise<unknown>) => void }
+>();
 
 export function getUpdateEnv(update: Update): CoreEnv | undefined {
   return updateEnvMap.get(update);
@@ -93,11 +97,9 @@ export async function handleUpdate(
   const currentBotId = botId;
   const currentWaitUntil = waitUntil;
 
-  // Store env in WeakMap associated with the update object
+  // Store env and context in WeakMaps associated with the update object
   updateEnvMap.set(update, currentEnv);
-
-  // Attach other metadata to update (safe as they are serializable or just strings)
-  Object.assign(update, {
+  updateContextMap.set(update, {
     botId: currentBotId,
     waitUntil: currentWaitUntil,
   });
@@ -129,13 +131,8 @@ async function setupBotMiddleware(
   const db = env.DB;
 
   bot.use(async (ctx, next) => {
-    // Retrieve request-specific context from the update object or WeakMap
-    const reqContext = ctx.update as unknown as {
-      host?: string;
-      waitUntil?: (promise: Promise<unknown>) => void;
-    };
-
     const injectedEnv = updateEnvMap.get(ctx.update);
+    const injectedContext = updateContextMap.get(ctx.update);
 
     console.log(
       JSON.stringify({
@@ -148,10 +145,10 @@ async function setupBotMiddleware(
     );
 
     ctx.env = injectedEnv || env;
-    ctx.botId = botId;
+    ctx.botId = injectedContext?.botId || botId;
 
     ctx.platform = "telegram";
-    ctx.waitUntil = reqContext.waitUntil || _waitUntil;
+    ctx.waitUntil = injectedContext?.waitUntil || _waitUntil;
 
     await next();
   });

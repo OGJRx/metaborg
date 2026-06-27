@@ -101,6 +101,27 @@ export default {
           ? parts.slice(3).join("/")
           : "index.html";
 
+      // Sanitize assetPath to prevent path traversal
+      const sanitizedAssetPath = assetPath
+        .replace(/\.\./g, "")
+        .replace(/\/+/g, "/")
+        .replace(/^\//, "");
+
+      if (slug === "botfather") {
+        const bots = await env.DB.prepare(
+          "SELECT bot_name, bot_kind, config_json, slug FROM factory_bots",
+        ).all();
+        const asset = getMiniAppAsset(
+          sanitizedAssetPath,
+          "Titanium Dashboard",
+          "dashboard",
+          JSON.stringify(bots.results || []),
+        );
+        return new Response(asset.content, {
+          headers: { "content-type": asset.contentType },
+        });
+      }
+
       const bot = await env.DB.prepare(
         "SELECT bot_name, bot_kind, config_json FROM factory_bots WHERE slug = ? OR bot_id = ?",
       )
@@ -108,12 +129,6 @@ export default {
         .first<{ bot_name: string; bot_kind: string; config_json: string }>();
 
       if (!bot) return new Response("Not Found", { status: 404 });
-
-      // Sanitize assetPath to prevent path traversal
-      const sanitizedAssetPath = assetPath
-        .replace(/\.\./g, "")
-        .replace(/\/+/g, "/")
-        .replace(/^\//, "");
 
       const asset = getMiniAppAsset(
         sanitizedAssetPath,
@@ -166,10 +181,39 @@ export default {
         );
       }
 
+      // Update config_json and sync top-level fields
+      const updates = [];
+      const bindings = [];
+
+      updates.push("config_json = ?");
+      bindings.push(JSON.stringify(newConfig));
+
+      if (typeof newConfig.system_prompt === "string") {
+        updates.push("system_prompt = ?");
+        bindings.push(newConfig.system_prompt);
+      }
+
+      if (bot.bot_kind === "agendado") {
+        const biz = newConfig.business_identity as Record<string, unknown>;
+        if (biz && typeof biz.welcome_message === "string") {
+          updates.push("welcome_message = ?");
+          bindings.push(biz.welcome_message);
+        }
+      } else if (typeof newConfig.welcome_message === "string") {
+        updates.push("welcome_message = ?");
+        bindings.push(newConfig.welcome_message);
+      }
+
+      if (typeof newConfig.menu_json === "string") {
+        updates.push("menu_json = ?");
+        bindings.push(newConfig.menu_json);
+      }
+
+      bindings.push(slug);
       await env.DB.prepare(
-        "UPDATE factory_bots SET config_json = ?, updated_at = CURRENT_TIMESTAMP WHERE slug = ?",
+        `UPDATE factory_bots SET ${updates.join(", ")}, updated_at = CURRENT_TIMESTAMP WHERE slug = ?`,
       )
-        .bind(JSON.stringify(newConfig), slug)
+        .bind(...bindings)
         .run();
 
       return Response.json({ success: true });

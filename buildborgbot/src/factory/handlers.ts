@@ -189,7 +189,7 @@ export async function handleConfirmAndProcess(
       const responseBlocks = smartSplitHtml(result.text);
 
       for (const block of responseBlocks) {
-        const sentMsg = await ctx.reply(block, { parse_mode: "HTML" });
+        const sentMsg = await ctx.reply(block);
         await db
           .prepare(
             "INSERT INTO factory_messages (bot_id, chat_id, message_id, role, content) VALUES (?, ?, ?, ?, ?)",

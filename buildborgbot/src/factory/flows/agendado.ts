@@ -49,13 +49,12 @@ export async function handleAgendadoUpdate(
     ctx.hasCommand("start") ||
     (session.paso_actual === 0 &&
       !callbackData &&
-      Object.keys(session.step_data || {}).length === 0)
+      (!session.step_data || Object.keys(session.step_data).length === 0))
   ) {
     session.paso_actual = 0;
     session.step_data = {};
     session.estado_flujo = "iniciado";
-    // We don't await welcome message here to avoid double send if renderStep also sends something
-    // but the original logic had it.
+
     await ctx.reply(config.business_identity.welcome_message, {
       parse_mode: "HTML",
     });
