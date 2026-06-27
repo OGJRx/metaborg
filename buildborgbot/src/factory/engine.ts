@@ -10,11 +10,7 @@ import { RelationalSessionAdapter } from "./adapter";
 import { setupBotFather } from "./botfather";
 import { assertNever, BotKindSetupRegistry, setupOrphanBot } from "./registry";
 import type { BotKind } from "./schemas";
-import {
-  type CoreEnv,
-  type FactoryContext,
-  type TitaniumSession,
-} from "./types";
+import type { CoreEnv, FactoryContext, TitaniumSession } from "./types";
 
 // --- FACTORY ENGINE ---
 
@@ -84,7 +80,7 @@ export async function handleUpdate(
     supports_join_request_queries: false,
   };
 
-  let botRef = botCache.get(botId);
+  const botRef = botCache.get(botId);
   let bot = botRef?.deref();
 
   if (!bot) {

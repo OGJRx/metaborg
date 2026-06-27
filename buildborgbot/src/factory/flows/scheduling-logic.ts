@@ -123,7 +123,7 @@ export async function createTicketAtomic(
   db: D1Database,
   data: {
     botId: string;
-    sessionId?: string;
+    sessionId: string | undefined;
     platform: string;
     chatId: string;
     stepData: string;

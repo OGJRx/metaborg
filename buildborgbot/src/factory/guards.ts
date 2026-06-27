@@ -1,5 +1,5 @@
 import { getUpdateEnv } from "./engine";
-import { type FactoryContext } from "./types";
+import type { FactoryContext } from "./types";
 
 export function assertEnv(
   ctx: FactoryContext,
@@ -27,7 +27,6 @@ export function assertEnv(
         botId: ctx.botId ?? "unknown",
         hasUpdate: !!ctx.update,
         hasSession: !!ctx.session,
-        sessionHasEnv: !!ctx.session?._titaniumEnv,
         timestamp: new Date().toISOString(),
       }),
     );
