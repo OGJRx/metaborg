@@ -167,7 +167,14 @@ export default {
       const isValid = await validateTelegramInitData(initData, plainToken);
       if (!isValid) return new Response("Invalid signature", { status: 403 });
 
-      const newConfig = (await request.json()) as Record<string, unknown>;
+      interface ConfigPayload {
+        system_prompt?: string;
+        welcome_message?: string;
+        business_identity?: { welcome_message?: string };
+        menu_json?: string;
+      }
+      const newConfig = (await request.json()) as ConfigPayload &
+        Record<string, unknown>;
 
       // Validation logic: Ensure the config matches the bot_kind
       try {
@@ -194,7 +201,7 @@ export default {
       }
 
       if (bot.bot_kind === "agendado") {
-        const biz = newConfig.business_identity as Record<string, unknown>;
+        const biz = newConfig.business_identity;
         if (biz && typeof biz.welcome_message === "string") {
           updates.push("welcome_message = ?");
           bindings.push(biz.welcome_message);

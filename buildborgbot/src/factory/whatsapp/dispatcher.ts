@@ -126,6 +126,7 @@ export async function handleWhatsAppWebhook(
       chat: {
         id: Number.parseInt(chatId.replace(/\D/g, ""), 10) || 0,
         type: "private",
+        first_name: "WA User",
       },
       from: {
         id: Number.parseInt(chatId.replace(/\D/g, ""), 10) || 0,
@@ -200,25 +201,28 @@ export async function handleWhatsAppWebhook(
         });
         return { message_id: 0 } as never;
       },
-      hasCommand: (cmd: string) => message.text?.body === `/${cmd}`,
+      hasCommand: ((cmd: string) =>
+        message.text?.body === `/${cmd}`) as FactoryContext["hasCommand"],
     };
 
     await handleAgendadoUpdate(waContext as FactoryContext, config);
 
     // Persist session
     ctx.waitUntil(
-      sessionAdapter.write(sessionKey, waContext.session).catch((err) => {
-        console.error(
-          JSON.stringify({
-            level: "error",
-            tag: "WHATSAPP_SESSION_WRITE_FAILED",
-            botId: bot.bot_id,
-            chatId,
-            error: String(err),
-            timestamp: new Date().toISOString(),
-          }),
-        );
-      }),
+      sessionAdapter
+        .write(sessionKey, waContext.session as TitaniumSession)
+        .catch((err) => {
+          console.error(
+            JSON.stringify({
+              level: "error",
+              tag: "WHATSAPP_SESSION_WRITE_FAILED",
+              botId: bot.bot_id,
+              chatId,
+              error: String(err),
+              timestamp: new Date().toISOString(),
+            }),
+          );
+        }),
     );
   }
 
