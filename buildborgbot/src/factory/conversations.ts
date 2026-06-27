@@ -153,7 +153,7 @@ export async function newBotConversation(
                 }),
               }),
         },
-        botTokenCtx.host,
+        liveCtx.host,
       ),
     );
 

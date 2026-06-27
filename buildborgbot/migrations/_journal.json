@@ -1,0 +1,65 @@
+{
+  "version": "1",
+  "migrations": [
+    {
+      "version": "1",
+      "name": "0000_initial.sql",
+      "checksum": "dd6843fe598466eda120f37a4b7c112d82d13f16"
+    },
+    {
+      "version": "2",
+      "name": "0001_add_webhook_secret.sql",
+      "checksum": "d24d98118118a8f0aa7b167450fe24f961a51272"
+    },
+    {
+      "version": "3",
+      "name": "0002_create_messages_and_sequences.sql",
+      "checksum": "f7cf363251d8c15335688e8c024ec45993d9309f"
+    },
+    {
+      "version": "4",
+      "name": "0003_sessions_and_feedback.sql",
+      "checksum": "48b45db034a8cc1834625411872eb828c83b0781"
+    },
+    {
+      "version": "5",
+      "name": "0004_titanium_core.sql",
+      "checksum": "7c325d6956320f67305aa49875e28ffcb2174cdd"
+    },
+    {
+      "version": "6",
+      "name": "0005_titanium_maintenance.sql",
+      "checksum": "4462abed8226aeb606a88534945c0f1bc26298f8"
+    },
+    {
+      "version": "7",
+      "name": "0006_webhook_tracking.sql",
+      "checksum": "9262397b594f3ca082116d25ac693a41c6e293a2"
+    },
+    {
+      "version": "8",
+      "name": "0007_unified_titanium.sql",
+      "checksum": "64c6be2a512573af8ca3167b8a739d89f0660e5b"
+    },
+    {
+      "version": "9",
+      "name": "0008_create_conversations_table.sql",
+      "checksum": "b096e12652f1f723d61041c5f73dc44c2af1a6c4"
+    },
+    {
+      "version": "10",
+      "name": "0009_platform_borg_schema.sql",
+      "checksum": "dc38801f47d95351e0a759b47902393f43229c5a"
+    },
+    {
+      "version": "11",
+      "name": "0010_recreate_factory_bots.sql",
+      "checksum": "99124e5cf4c42c732e0f0a136b9870fc779d4fe7"
+    },
+    {
+      "version": "12",
+      "name": "0011_journal_repair.sql",
+      "checksum": "9d810df8e9d12cc3b9150d4170107e28379df895"
+    }
+  ]
+}

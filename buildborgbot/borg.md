@@ -32,10 +32,10 @@ You are the central intelligence of the Titanium Factory. Your communication is 
 - [x] Relational Session Adapter (D1)
 - [x] Unified Bot Kind Registry
 - [x] OBD Specialist Integration (tool_specialist)
-- [ ] Restore Migration Journal Integrity
-- [ ] Eradicate `FACTORY_ENV_SYMBOL` leak
+- [x] Restore Migration Journal Integrity
+- [x] Eradicate `FACTORY_ENV_SYMBOL` leak
+- [x] Fix Appointment Confirmation Integrity (session_id)
 - [ ] Implement OIDC Deployment
-- [ ] Fix Appointment Confirmation Integrity (session_id)
 
 ## ⚙️ OPERATIONAL LOGIC
 

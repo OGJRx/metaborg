@@ -241,7 +241,7 @@ export default {
           update,
           env,
           ctx.waitUntil.bind(ctx),
-          request.headers.get("host") || "unknown",
+        request.headers.get("host") || new URL(request.url).host,
         );
       }
 
@@ -314,7 +314,7 @@ export default {
         update,
         env,
         ctx.waitUntil.bind(ctx),
-        request.headers.get("host") || "unknown",
+        request.headers.get("host") || new URL(request.url).host,
       );
     }
 
@@ -383,7 +383,7 @@ export default {
             owner_id: validated.owner_id,
           }),
         },
-        request.headers.get("host") || "unknown",
+        request.headers.get("host") || new URL(request.url).host,
       );
 
       return Response.json(result);

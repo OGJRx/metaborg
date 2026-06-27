@@ -151,42 +151,97 @@ export async function upsertBotConfig(
   let webhook_ok = true;
   let webhook_error: string | undefined;
   if (plainToken && webhookSecret) {
-    const webhookUrl = `https://${host}/webhook/${slug}`;
-    const telegramApiUrl = `https://api.telegram.org/bot${plainToken}/setWebhook?url=${encodeURIComponent(webhookUrl)}&secret_token=${webhookSecret}&allowed_updates=["message","callback_query"]`;
-    try {
-      const tgRes = await fetch(telegramApiUrl);
-      const tgData = (await tgRes.json()) as {
-        ok: boolean;
-        description?: string;
-      };
-      if (tgData.ok) {
-        await db
-          .prepare(
-            "UPDATE factory_bots SET webhook_configured_at = CURRENT_TIMESTAMP, webhook_last_error = NULL WHERE bot_id = ?",
-          )
-          .bind(validated.bot_id)
-          .run();
-      } else {
+      if (!host || host === "unknown" || !host.includes(".")) {
+        console.error(
+          JSON.stringify({
+            level: "error",
+            tag: "WEBHOOK_INVALID_HOST",
+            botId: validated.bot_id,
+            slug,
+            host,
+            timestamp: new Date().toISOString(),
+          }),
+        );
         webhook_ok = false;
-        webhook_error = tgData.description || "Unknown error";
+        webhook_error = `Invalid host for webhook: "${host}". Expected public domain.`;
         await db
           .prepare(
             "UPDATE factory_bots SET webhook_last_error = ? WHERE bot_id = ?",
           )
           .bind(webhook_error, validated.bot_id)
           .run();
+      } else {
+        const webhookUrl = `https://${host}/webhook/${slug}`;
+        const telegramApiUrl = `https://api.telegram.org/bot${plainToken}/setWebhook?url=${encodeURIComponent(webhookUrl)}&secret_token=${webhookSecret}&allowed_updates=["message","callback_query"]`;
+        try {
+          const tgRes = await fetch(telegramApiUrl);
+          const tgData = (await tgRes.json()) as {
+            ok: boolean;
+            description?: string;
+          };
+          if (tgData.ok) {
+            console.log(
+              JSON.stringify({
+                level: "info",
+                tag: "WEBHOOK_SET",
+                botId: validated.bot_id,
+                slug,
+                host,
+                webhookUrl,
+                timestamp: new Date().toISOString(),
+              }),
+            );
+            await db
+              .prepare(
+                "UPDATE factory_bots SET webhook_configured_at = CURRENT_TIMESTAMP, webhook_last_error = NULL WHERE bot_id = ?",
+              )
+              .bind(validated.bot_id)
+              .run();
+          } else {
+            console.error(
+              JSON.stringify({
+                level: "error",
+                tag: "WEBHOOK_SET_FAILED",
+                botId: validated.bot_id,
+                slug,
+                host,
+                webhookUrl,
+                telegramError: tgData.description,
+                timestamp: new Date().toISOString(),
+              }),
+            );
+            webhook_ok = false;
+            webhook_error = tgData.description || "Unknown error";
+            await db
+              .prepare(
+                "UPDATE factory_bots SET webhook_last_error = ? WHERE bot_id = ?",
+              )
+              .bind(webhook_error, validated.bot_id)
+              .run();
+          }
+        } catch (e) {
+          console.error(
+            JSON.stringify({
+              level: "error",
+              tag: "WEBHOOK_SET_ERROR",
+              botId: validated.bot_id,
+              slug,
+              host,
+              webhookUrl,
+              error: String(e),
+              timestamp: new Date().toISOString(),
+            }),
+          );
+          webhook_ok = false;
+          webhook_error = String(e);
+          await db
+            .prepare(
+              "UPDATE factory_bots SET webhook_last_error = ? WHERE bot_id = ?",
+            )
+            .bind(webhook_error, validated.bot_id)
+            .run();
+        }
       }
-    } catch (e) {
-      webhook_ok = false;
-      webhook_error = String(e);
-      await db
-        .prepare(
-          "UPDATE factory_bots SET webhook_last_error = ? WHERE bot_id = ?",
-        )
-        .bind(webhook_error, validated.bot_id)
-        .run();
-    }
-  }
   return {
     success: true,
     ...(webhook_ok !== undefined && { webhook_ok }),
