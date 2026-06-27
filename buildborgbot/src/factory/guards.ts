@@ -12,9 +12,9 @@ export function assertEnv(
 
   // 2. Second priority: Context property (might be already set by middleware)
   if (ctx.session) {
-    if (!ctx.botId && ctx.session._titaniumBotId)
+    if (!ctx.botId && ctx.session._titaniumBotId) {
       ctx.botId = ctx.session._titaniumBotId;
-    
+    }
   }
 
   // 3. Validation: The DB binding must be present AND functional
