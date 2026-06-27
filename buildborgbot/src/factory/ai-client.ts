@@ -70,15 +70,11 @@ export async function generateAIResponse(
       ]);
 
       // Accessing response text in @google/genai v2
-      // Using response.text() helper if available, or direct access.
       const response = result;
-      let text = "";
-      try {
-        // biome-ignore lint/suspicious/noExplicitAny: library specific access
-        text = (response as any).text();
-      } catch (_e) {
-        text = response.candidates?.[0]?.content?.parts?.[0]?.text || "";
-      }
+      const text =
+        response.text ||
+        response.candidates?.[0]?.content?.parts?.[0]?.text ||
+        "";
 
       if (!text) {
         console.error(
