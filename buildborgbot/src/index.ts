@@ -241,7 +241,7 @@ export default {
           update,
           env,
           ctx.waitUntil.bind(ctx),
-        request.headers.get("host") || new URL(request.url).host,
+          request.headers.get("host") || new URL(request.url).host,
         );
       }
 
