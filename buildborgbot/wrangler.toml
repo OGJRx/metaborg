@@ -6,6 +6,7 @@ preview_urls = false
 
 [vars]
 AI_MODEL_NAME = "gemini-flash-lite-latest"
+WORKER_HOST = "fabricaborgbots.marketceogjr.workers.dev"
 
 [[d1_databases]]
 binding = "DB"

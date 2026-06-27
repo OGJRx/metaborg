@@ -63,7 +63,6 @@ export async function upsertBotConfig(
     stack_id?: string;
     owner_id?: number;
   },
-  host: string,
 ): Promise<{
   success: boolean;
   webhook_ok?: boolean;
@@ -151,19 +150,19 @@ export async function upsertBotConfig(
   let webhook_ok = true;
   let webhook_error: string | undefined;
   if (plainToken && webhookSecret) {
-    if (!host || host === "unknown" || !host.includes(".")) {
+    if (!env.WORKER_HOST?.includes(".")) {
       console.error(
         JSON.stringify({
           level: "error",
           tag: "WEBHOOK_INVALID_HOST",
           botId: validated.bot_id,
           slug,
-          host,
+          host: env.WORKER_HOST,
           timestamp: new Date().toISOString(),
         }),
       );
       webhook_ok = false;
-      webhook_error = `Invalid host for webhook: "${host}". Expected public domain.`;
+      webhook_error = `Invalid or missing WORKER_HOST: "${env.WORKER_HOST}". Expected public domain.`;
       await db
         .prepare(
           "UPDATE factory_bots SET webhook_last_error = ? WHERE bot_id = ?",
@@ -171,7 +170,7 @@ export async function upsertBotConfig(
         .bind(webhook_error, validated.bot_id)
         .run();
     } else {
-      const webhookUrl = `https://${host}/webhook/${slug}`;
+      const webhookUrl = `https://${env.WORKER_HOST}/webhook/${slug}`;
       const telegramApiUrl = `https://api.telegram.org/bot${plainToken}/setWebhook?url=${encodeURIComponent(webhookUrl)}&secret_token=${webhookSecret}&allowed_updates=["message","callback_query"]`;
       try {
         const tgRes = await fetch(telegramApiUrl);
@@ -186,7 +185,7 @@ export async function upsertBotConfig(
               tag: "WEBHOOK_SET",
               botId: validated.bot_id,
               slug,
-              host,
+              host: env.WORKER_HOST,
               webhookUrl,
               timestamp: new Date().toISOString(),
             }),
@@ -204,7 +203,7 @@ export async function upsertBotConfig(
               tag: "WEBHOOK_SET_FAILED",
               botId: validated.bot_id,
               slug,
-              host,
+              host: env.WORKER_HOST,
               webhookUrl,
               telegramError: tgData.description,
               timestamp: new Date().toISOString(),
@@ -226,7 +225,7 @@ export async function upsertBotConfig(
             tag: "WEBHOOK_SET_ERROR",
             botId: validated.bot_id,
             slug,
-            host,
+            host: env.WORKER_HOST,
             webhookUrl,
             error: String(e),
             timestamp: new Date().toISOString(),

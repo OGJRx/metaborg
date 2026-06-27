@@ -241,7 +241,6 @@ export default {
           update,
           env,
           ctx.waitUntil.bind(ctx),
-          request.headers.get("host") || new URL(request.url).host,
         );
       }
 
@@ -314,7 +313,6 @@ export default {
         update,
         env,
         ctx.waitUntil.bind(ctx),
-        request.headers.get("host") || new URL(request.url).host,
       );
     }
 
@@ -363,28 +361,23 @@ export default {
       const body = await request.json();
       const validated = ConfigSchema.parse(body);
 
-      const result = await upsertBotConfig(
-        env.DB,
-        env,
-        {
-          bot_id: validated.bot_id,
-          bot_name: validated.bot_name,
-          token_var_name: validated.token_var_name,
-          system_prompt: validated.system_prompt || "",
-          welcome_message: validated.welcome_message || "",
-          menu_json: validated.menu_json || "[]",
-          bot_kind: validated.bot_kind,
-          config_json: validated.config_json,
-          ...(validated.token !== undefined && { token: validated.token }),
-          ...(validated.stack_id !== undefined && {
-            stack_id: validated.stack_id,
-          }),
-          ...(validated.owner_id !== undefined && {
-            owner_id: validated.owner_id,
-          }),
-        },
-        request.headers.get("host") || new URL(request.url).host,
-      );
+      const result = await upsertBotConfig(env.DB, env, {
+        bot_id: validated.bot_id,
+        bot_name: validated.bot_name,
+        token_var_name: validated.token_var_name,
+        system_prompt: validated.system_prompt || "",
+        welcome_message: validated.welcome_message || "",
+        menu_json: validated.menu_json || "[]",
+        bot_kind: validated.bot_kind,
+        config_json: validated.config_json,
+        ...(validated.token !== undefined && { token: validated.token }),
+        ...(validated.stack_id !== undefined && {
+          stack_id: validated.stack_id,
+        }),
+        ...(validated.owner_id !== undefined && {
+          owner_id: validated.owner_id,
+        }),
+      });
 
       return Response.json(result);
     }
@@ -628,7 +621,7 @@ export default {
         return new Response("Unauthorized", { status: 401 });
       }
 
-      const webhookUrl = `https://${request.headers.get("host") || url.host}/webhook/botfather`;
+      const webhookUrl = `https://${env.WORKER_HOST}/webhook/botfather`;
       const telegramUrl = `https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/setWebhook?url=${encodeURIComponent(webhookUrl)}&secret_token=${env.TITANIUM_API_SECRET}&allowed_updates=["message","callback_query"]`;
 
       try {

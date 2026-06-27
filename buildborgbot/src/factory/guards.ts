@@ -14,8 +14,7 @@ export function assertEnv(
   if (ctx.session) {
     if (!ctx.botId && ctx.session._titaniumBotId)
       ctx.botId = ctx.session._titaniumBotId;
-    if (!ctx.host && ctx.session._titaniumHost)
-      ctx.host = ctx.session._titaniumHost;
+    
   }
 
   // 3. Validation: The DB binding must be present AND functional

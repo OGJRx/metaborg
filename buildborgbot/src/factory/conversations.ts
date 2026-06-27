@@ -126,35 +126,30 @@ export async function newBotConversation(
     assertEnv(liveCtx);
 
     const result = await conversation.external(() =>
-      upsertBotConfig(
-        liveCtx.env.DB,
-        liveCtx.env,
-        {
-          bot_id: botId,
-          bot_name: botName,
-          token: botToken,
-          token_var_name: `BOT_TOKEN_${botId
-            .toUpperCase()
-            .replace(/[^A-Z0-9]/g, "_")}`,
-          system_prompt: systemPrompt,
-          welcome_message: isAgendado
-            ? agendadoConfig.business_identity.welcome_message
-            : `¡Hola! Soy ${botName}. ¿En qué puedo ayudarte?`,
-          menu_json: "[]",
-          bot_kind: botKind,
-          config_json: isAgendado
-            ? JSON.stringify(agendadoConfig)
-            : JSON.stringify({
-                system_prompt: systemPrompt,
-                welcome_message: `¡Hola! Soy ${botName}. ¿En qué puedo ayudarte?`,
-                menu_json: "[]",
-                ...(botKind === "tool_specialist" && {
-                  lookup_source: "obd_db",
-                }),
+      upsertBotConfig(liveCtx.env.DB, liveCtx.env, {
+        bot_id: botId,
+        bot_name: botName,
+        token: botToken,
+        token_var_name: `BOT_TOKEN_${botId
+          .toUpperCase()
+          .replace(/[^A-Z0-9]/g, "_")}`,
+        system_prompt: systemPrompt,
+        welcome_message: isAgendado
+          ? agendadoConfig.business_identity.welcome_message
+          : `¡Hola! Soy ${botName}. ¿En qué puedo ayudarte?`,
+        menu_json: "[]",
+        bot_kind: botKind,
+        config_json: isAgendado
+          ? JSON.stringify(agendadoConfig)
+          : JSON.stringify({
+              system_prompt: systemPrompt,
+              welcome_message: `¡Hola! Soy ${botName}. ¿En qué puedo ayudarte?`,
+              menu_json: "[]",
+              ...(botKind === "tool_specialist" && {
+                lookup_source: "obd_db",
               }),
-        },
-        liveCtx.host,
-      ),
+            }),
+      }),
     );
 
     if (result.success) {
@@ -165,7 +160,7 @@ export async function newBotConversation(
         if (botKind === "agendado") {
           msg +=
             "\n\n⚙️ <b>CONFIGURACIÓN PENDIENTE:</b> Este bot de agendado requiere personalización (steps, horarios, etc). Usa el botón de abajo para abrir el editor visual.";
-          const webAppUrl = `https://${liveCtx.host}/app/${botId}`;
+          const webAppUrl = `https://${liveCtx.env.WORKER_HOST}/app/${botId}`;
           keyboard = new InlineKeyboard().webApp("🛠️ Abrir Editor", webAppUrl);
         }
 

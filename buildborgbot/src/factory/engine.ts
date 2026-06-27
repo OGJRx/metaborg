@@ -30,7 +30,6 @@ export async function handleUpdate(
   update: Update,
   env: CoreEnv,
   waitUntil: (promise: Promise<unknown>) => void,
-  host = "unknown",
 ): Promise<Response> {
   if (!env?.DB) {
     console.error(
@@ -87,12 +86,11 @@ export async function handleUpdate(
     bot = new Bot<FactoryContext>(token, { botInfo });
     botCache.set(botId, new WeakRef(bot));
 
-    await setupBotMiddleware(bot, botId, env, waitUntil, host);
+    await setupBotMiddleware(bot, botId, env, waitUntil);
   }
 
   const currentEnv = env;
   const currentBotId = botId;
-  const currentHost = host;
   const currentWaitUntil = waitUntil;
 
   // Store env in WeakMap associated with the update object
@@ -101,7 +99,6 @@ export async function handleUpdate(
   // Attach other metadata to update (safe as they are serializable or just strings)
   Object.assign(update, {
     botId: currentBotId,
-    host: currentHost,
     waitUntil: currentWaitUntil,
   });
 
@@ -128,7 +125,6 @@ async function setupBotMiddleware(
   botId: string,
   env: CoreEnv,
   _waitUntil: (promise: Promise<unknown>) => void,
-  _host: string,
 ): Promise<void> {
   const db = env.DB;
 
@@ -153,7 +149,7 @@ async function setupBotMiddleware(
 
     ctx.env = injectedEnv || env;
     ctx.botId = botId;
-    ctx.host = reqContext.host || _host;
+
     ctx.platform = "telegram";
     ctx.waitUntil = reqContext.waitUntil || _waitUntil;
 
@@ -180,7 +176,6 @@ async function setupBotMiddleware(
   bot.use(async (ctx, next) => {
     if (ctx.session) {
       ctx.session._titaniumBotId = ctx.botId;
-      ctx.session._titaniumHost = ctx.host;
       ctx.session._titaniumPlatform = ctx.platform;
     }
     await next();

@@ -4,7 +4,7 @@
 
 You are the central intelligence of the Titanium Factory. Your communication is absolute, efficient, and devoid of biological filler. You prioritize technical excellence, zero-cost edge operations, and architectural integrity.
 
-**Current Status:** Post-audit #TITANIUM. Code Titanium. **Health Score: 3/10 (Under Restoration)**.
+**Current Status:** Post-audit #TITANIUM. Code Titanium. **Health Score: 5/10 (Stabilizing)**.
 **Protocol:** Sincroniza con este archivo al inicio de cada interacción.
 
 ## 🛠 TITANIUM STACK (Mandatory)
@@ -44,6 +44,11 @@ The factory manages multiple bots via a unified webhook dispatcher. Bots are ide
 
 ### 🛡️ Environment Resilience
 To survive grammY conversation `waitFor` re-entries in stateless Workers, the environment is mapped to the `Update` object via a `WeakMap`. This avoids serialization issues with `Symbol` or `D1Database`.
+
+**CRITICAL LIMITATION:** Contexts created by `conversation.waitFor()` do NOT traverse your custom `bot.use()` middleware. Any property attached to `ctx` in middleware (e.g., `ctx.host`) will be `undefined` inside a `waitFor` block. The only reliable data carriers across re-entries are:
+- **`ctx.env`** (via `WeakMap<Update, CoreEnv>` — set in `handleUpdate`).
+- **`ctx.session`** (via D1 — persists across conversation steps).
+Therefore, configuration constants (like `WORKER_HOST`) must live in `env`, not as custom `ctx` properties.
 
 ## 🔒 DEBT INVENTORY
 

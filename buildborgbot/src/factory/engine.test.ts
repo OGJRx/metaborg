@@ -49,6 +49,7 @@ describe("Engine Handlers Business Logic", () => {
       TITANIUM_API_SECRET: "test-api-secret",
       TELEGRAM_BOT_TOKEN: "123:abc",
       BOT_TOKENS: {},
+      WORKER_HOST: "test-host.fabricaborgbots.workers.dev",
     };
   }
 

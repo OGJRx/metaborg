@@ -12,6 +12,7 @@ export interface CoreEnv {
   MIGRATION_KEY?: string;
   ADMIN_TELEGRAM_IDS?: string;
   BOT_TOKENS: Record<string, string | undefined>;
+  WORKER_HOST: string;
 }
 
 export interface FactoryBotConfig {
@@ -49,7 +50,6 @@ export type FactoryContext = Context &
     conversation: ConversationFlavor<Context>["conversation"];
     env: CoreEnv;
     botId: string;
-    host: string;
     platform: "telegram" | "whatsapp";
     waitUntil: (promise: Promise<unknown>) => void;
     replyInteractiveButtons?: (
