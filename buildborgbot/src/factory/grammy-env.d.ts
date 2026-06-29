@@ -1,3 +1,5 @@
+import "grammy";
+
 declare module "grammy" {
   interface Api {
     /**

@@ -10,20 +10,31 @@ export async function* getGeminiStream(
   config: StreamConfig,
   userInput: string,
 ): AsyncGenerator<string, void, unknown> {
-  const genAI = new GoogleGenAI({ apiKey: config.apiKey });
+  const client = new GoogleGenAI({ apiKey: config.apiKey });
 
   // Respaldo dinámico a gemini-3.1-flash-lite si no viene configurado
-  // En 2026 usamos lo más reciente, pero el SDK es v2
   const modelName = config.modelName || "gemini-3.1-flash-lite";
-  const model = genAI.getGenerativeModel({
+
+  const responseStream = await client.models.generateContentStream({
     model: modelName,
-    systemInstruction: SKILL_FORMAT,
+    contents: [
+      {
+        role: "user",
+        parts: [{ text: `${SKILL_FORMAT}\n\nUser Input: ${userInput}` }],
+      },
+    ],
+    config: {
+      systemInstruction: {
+        role: "system",
+        parts: [{ text: SKILL_FORMAT }],
+      },
+    } as unknown as Record<string, unknown>,
   });
 
-  const result = await model.generateContentStream(userInput);
-
-  for await (const chunk of result.stream) {
-    const text = chunk.text();
+  for await (const chunk of responseStream) {
+    // Accessing response text in @google/genai v2
+    const text =
+      chunk.text || chunk.candidates?.[0]?.content?.parts?.[0]?.text || "";
     if (text) {
       yield text;
     }

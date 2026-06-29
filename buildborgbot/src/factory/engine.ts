@@ -107,7 +107,8 @@ export async function handleUpdate(
   // Mapeador para que ctx.api.sendMessageDraft invoque ctx.api.raw de forma transparente
   bot.api.config.use((prev, method, payload, signal) => {
     if (method === "sendMessageDraft") {
-      return prev("sendMessageDraft", payload, signal);
+      // biome-ignore lint/suspicious/noExplicitAny: External API mapping requires any for payload bypass
+      return prev("sendMessageDraft", payload as any, signal);
     }
     return prev(method, payload, signal);
   });
