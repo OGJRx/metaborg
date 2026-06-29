@@ -107,7 +107,16 @@ export default {
         .replace(/\/+/g, "/")
         .replace(/^\//, "");
 
+      const initData = request.headers.get("X-Telegram-Init-Data");
+
       if (slug === "botfather") {
+        if (
+          !initData ||
+          !(await validateTelegramInitData(initData, env.TELEGRAM_BOT_TOKEN))
+        ) {
+          return new Response("Unauthorized", { status: 401 });
+        }
+
         const bots = await env.DB.prepare(
           "SELECT bot_name, bot_kind, config_json, slug FROM factory_bots",
         ).all();
@@ -123,12 +132,29 @@ export default {
       }
 
       const bot = await env.DB.prepare(
-        "SELECT bot_name, bot_kind, config_json FROM factory_bots WHERE slug = ? OR bot_id = ?",
+        "SELECT bot_name, bot_kind, config_json, token, token_iv FROM factory_bots WHERE slug = ? OR bot_id = ?",
       )
         .bind(slug, slug)
-        .first<{ bot_name: string; bot_kind: string; config_json: string }>();
+        .first<{
+          bot_name: string;
+          bot_kind: string;
+          config_json: string;
+          token: string;
+          token_iv: string;
+        }>();
 
       if (!bot) return new Response("Not Found", { status: 404 });
+
+      if (bot.token && bot.token_iv) {
+        const key = await deriveKey(env.TITANIUM_API_SECRET);
+        const plainToken = await decrypt(bot.token, bot.token_iv, key);
+        if (
+          !initData ||
+          !(await validateTelegramInitData(initData, plainToken))
+        ) {
+          return new Response("Unauthorized", { status: 401 });
+        }
+      }
 
       const asset = getMiniAppAsset(
         sanitizedAssetPath,
@@ -591,7 +617,7 @@ export default {
         return new Response("Unauthorized", { status: 401 });
       }
       const bots = await env.DB.prepare(
-        "SELECT bot_id, bot_name, token_var_name, system_prompt, welcome_message, menu_json, slug, webhook_secret FROM factory_bots",
+        "SELECT bot_id, bot_name, token_var_name, system_prompt, welcome_message, menu_json, slug FROM factory_bots",
       ).all();
       return Response.json(bots.results);
     }
@@ -673,10 +699,18 @@ export default {
       }
 
       const webhookUrl = `https://${env.WORKER_HOST}/webhook/botfather`;
-      const telegramUrl = `https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/setWebhook?url=${encodeURIComponent(webhookUrl)}&secret_token=${env.TITANIUM_API_SECRET}&allowed_updates=["message","callback_query"]`;
+      const telegramUrl = `https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/setWebhook`;
 
       try {
-        const res = await fetch(telegramUrl);
+        const res = await fetch(telegramUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            url: webhookUrl,
+            secret_token: env.TITANIUM_API_SECRET,
+            allowed_updates: ["message", "callback_query"],
+          }),
+        });
         const data = (await res.json()) as {
           ok: boolean;
           description?: string;

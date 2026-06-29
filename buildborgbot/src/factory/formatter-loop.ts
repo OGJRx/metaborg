@@ -2,21 +2,6 @@ import { getGeminiStream, type StreamConfig } from "./ai-stream-client";
 import type { FactoryContext } from "./types";
 
 export class FormatterLoop {
-  private clockEmojis = [
-    "🕛",
-    "🕐",
-    "🕑",
-    "🕒",
-    "🕓",
-    "🕔",
-    "🕕",
-    "🕖",
-    "🕗",
-    "🕘",
-    "🕙",
-    "🕚",
-  ];
-
   constructor(
     private db: D1Database,
     private chatId: number,
@@ -65,34 +50,17 @@ export class FormatterLoop {
     return balanced;
   }
 
-  private async persistFragment(
-    chunkIndex: number,
-    text: string,
-  ): Promise<void> {
-    try {
-      await this.db
-        .prepare(
-          "INSERT INTO factory_messages (bot_id, chat_id, role, content, chunk_index) VALUES (?, ?, 'assistant_fragment', ?, ?)",
-        )
-        .bind(this.botId, String(this.chatId), text, chunkIndex)
-        .run();
-    } catch (err) {
-      console.error("[D1 Save] Fallo al guardar fragmento:", err);
-    }
-  }
-
   public async execute(ctx: FactoryContext, userInput: string): Promise<void> {
     const draftId = ctx.session.draftId || Math.floor(Math.random() * 1000000);
     ctx.session.draftId = draftId;
 
     let accumulatedText = "";
     let isFirstChunkReceived = false;
-    let emojiIndex = 0;
-    let chunkCounter = 0;
 
     let fallbackMode: "DRAFT" | "EDIT" | "CONSOLIDATED" = "DRAFT";
     let editMessageId: number | null = null;
     let lastDeliveredText = "";
+    let lastDeliveryTimestamp = 0;
 
     const deliverPayload = async (text: string, isFinal = false) => {
       const safeText = this.balanceHtmlTags(text);
@@ -100,8 +68,8 @@ export class FormatterLoop {
 
       if (fallbackMode === "DRAFT") {
         try {
-          // Usar ctx.api.raw para asegurar compatibilidad si no está en grammY aún
-          await ctx.api.raw.sendMessageDraft({
+          // biome-ignore lint/suspicious/noExplicitAny: grammY 1.44 native support
+          await (ctx.api as any).sendMessageDraft({
             chat_id: this.chatId,
             draft_id: draftId,
             text: safeText,
@@ -142,23 +110,22 @@ export class FormatterLoop {
             String(err),
           );
           fallbackMode = "CONSOLIDATED";
+          // Fallback immediately to CONSOLIDATED delivery in same call
         }
       }
 
-      if (isFinal && fallbackMode === "CONSOLIDATED") {
-        await ctx.reply(safeText, { parse_mode: "HTML" }).catch(async () => {
-          const plainText = text.replace(/<[^>]*>/g, "");
-          await ctx.reply(plainText);
-        });
+      if (fallbackMode === "CONSOLIDATED") {
+        if (isFinal) {
+          await ctx.reply(safeText, { parse_mode: "HTML" }).catch(async () => {
+            const plainText = text.replace(/<[^>]*>/g, "");
+            await ctx.reply(plainText);
+          });
+        }
       }
     };
 
-    const animationInterval = setInterval(() => {
-      if (isFirstChunkReceived) return;
-      const emoji = this.clockEmojis[emojiIndex % this.clockEmojis.length];
-      emojiIndex++;
-      ctx.waitUntil(deliverPayload(`<i>Procesando... ${emoji}</i>`));
-    }, 500); // 500ms for safer UI updates
+    // Initial feedback
+    ctx.waitUntil(deliverPayload("<i>Procesando... 🕛</i>"));
 
     try {
       const stream = getGeminiStream(this.config, userInput);
@@ -166,30 +133,38 @@ export class FormatterLoop {
       for await (const chunk of stream) {
         if (!isFirstChunkReceived) {
           isFirstChunkReceived = true;
-          clearInterval(animationInterval);
         }
 
         accumulatedText += chunk;
-        chunkCounter++;
 
-        ctx.waitUntil(this.persistFragment(chunkCounter, chunk));
-        // Debounce delivery
-        if (chunkCounter % 5 === 0 || chunk.includes("\n")) {
+        const now = Date.now();
+        // Debounce delivery: 1500ms or newline
+        if (now - lastDeliveryTimestamp > 1500 || chunk.includes("\n")) {
+          lastDeliveryTimestamp = now;
           ctx.waitUntil(deliverPayload(accumulatedText));
         }
       }
 
       await deliverPayload(accumulatedText, true);
+
+      // Persist final message
+      await this.db
+        .prepare(
+          "INSERT INTO factory_messages (bot_id, chat_id, role, content) VALUES (?, ?, 'model', ?)",
+        )
+        .bind(this.botId, String(this.chatId), accumulatedText)
+        .run()
+        .catch((err) =>
+          console.error("[D1 Save] Error saving final message:", err),
+        );
+
       delete ctx.session.draftId;
     } catch (error) {
-      clearInterval(animationInterval);
       console.error("[Loop Error Fatal]", error);
       const cleanFallback =
         accumulatedText.replace(/<[^>]*>/g, "") ||
         "Error al procesar la respuesta.";
       await ctx.reply(cleanFallback).catch(() => {});
-    } finally {
-      clearInterval(animationInterval);
     }
   }
 }

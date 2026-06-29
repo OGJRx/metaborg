@@ -5,7 +5,7 @@ compatibility_date = "2026-06-25"
 preview_urls = false
 
 [vars]
-AI_MODEL_NAME = "gemini-flash-lite-latest"
+AI_MODEL_NAME = "gemini-3.1-flash-lite"
 WORKER_HOST = "fabricaborgbots.marketceogjr.workers.dev"
 
 [[d1_databases]]

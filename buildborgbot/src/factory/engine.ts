@@ -104,15 +104,6 @@ export async function handleUpdate(
     waitUntil: currentWaitUntil,
   });
 
-  // Mapeador para que ctx.api.sendMessageDraft invoque ctx.api.raw de forma transparente
-  bot.api.config.use((prev, method, payload, signal) => {
-    if (method === "sendMessageDraft") {
-      // biome-ignore lint/suspicious/noExplicitAny: External API mapping requires any for payload bypass
-      return prev("sendMessageDraft", payload as any, signal);
-    }
-    return prev(method, payload, signal);
-  });
-
   try {
     await bot.handleUpdate(update);
   } catch (e) {
