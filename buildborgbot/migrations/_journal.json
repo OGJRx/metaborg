@@ -65,6 +65,11 @@
       "version": "13",
       "name": "0012_create_factory_obd_codes.sql",
       "checksum": "faa6e05b107fbe2c1ea73b9ed15a2b6311756e56"
+    },
+    {
+      "version": "14",
+      "name": "0013_update_messages_for_fragments.sql",
+      "checksum": "bb5a6d1c49d96eb5cc2a4583f09506b725e7ea7d"
     }
   ]
 }

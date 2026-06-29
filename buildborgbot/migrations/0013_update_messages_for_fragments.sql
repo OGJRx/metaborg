@@ -9,7 +9,7 @@ CREATE TABLE factory_messages_new (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     bot_id TEXT NOT NULL REFERENCES factory_bots(bot_id) ON DELETE CASCADE,
     chat_id TEXT NOT NULL,
-    role TEXT NOT NULL,
+    role TEXT NOT NULL CHECK (role IN ('user', 'model', 'assistant_fragment', 'summary')),
     content TEXT NOT NULL,
     chunk_index INTEGER DEFAULT 0,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP

@@ -171,9 +171,17 @@ export async function upsertBotConfig(
         .run();
     } else {
       const webhookUrl = `https://${env.WORKER_HOST}/webhook/${slug}`;
-      const telegramApiUrl = `https://api.telegram.org/bot${plainToken}/setWebhook?url=${encodeURIComponent(webhookUrl)}&secret_token=${webhookSecret}&allowed_updates=["message","callback_query"]`;
+      const telegramApiUrl = `https://api.telegram.org/bot${plainToken}/setWebhook`;
       try {
-        const tgRes = await fetch(telegramApiUrl);
+        const tgRes = await fetch(telegramApiUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            url: webhookUrl,
+            secret_token: webhookSecret,
+            allowed_updates: ["message", "callback_query"],
+          }),
+        });
         const tgData = (await tgRes.json()) as {
           ok: boolean;
           description?: string;
