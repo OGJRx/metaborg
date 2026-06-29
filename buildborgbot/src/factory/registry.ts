@@ -10,6 +10,7 @@ import {
   handleConfirmAndProcess,
   handleSummarize,
 } from "./handlers";
+import { aiGlobalLoopMiddleware } from "./middleware/aiGlobalLoop";
 import {
   AgendadoConfigSchema,
   type BotKind,
@@ -44,6 +45,9 @@ export function setupBot(
   _configJson?: string,
 ) {
   bot.use(createConversation(feedbackConversation));
+
+  // Inyectar el loop global para procesamiento IA sin confirmación
+  bot.use(aiGlobalLoopMiddleware);
 
   bot.command("start", async (ctx) => {
     const currentDb = ctx.env.DB;
@@ -183,28 +187,15 @@ export function setupBot(
 
   bot.on("message:text", async (ctx) => {
     const text = ctx.message.text;
-    const msgId = ctx.message.message_id;
 
     if (!ctx.chat) return;
 
+    // Persistencia básica del mensaje del usuario
     await ctx.env.DB.prepare(
-      "INSERT INTO factory_messages (bot_id, chat_id, message_id, role, content) VALUES (?, ?, ?, ?, ?)",
+      "INSERT INTO factory_messages (bot_id, chat_id, role, content) VALUES (?, ?, 'user', ?)",
     )
-      .bind(ctx.botId, String(ctx.chat.id), msgId, "user", text)
+      .bind(ctx.botId, String(ctx.chat.id), text)
       .run();
-
-    const cb = await buildCallback(ctx.env.DB, ctx.env.TITANIUM_API_SECRET, {
-      bot_id: ctx.botId,
-      action: "fact_exec",
-      payload: String(msgId),
-    });
-
-    const keyboard = new InlineKeyboard().text("⚡ PROCESAR", cb);
-
-    await ctx.reply(
-      `ENTRADA RECIBIDA\n\nCONTENIDO: "${text.substring(0, 100)}${text.length > 100 ? "..." : ""}"\n\n¿Desea procesar este mensaje con IA?`,
-      { reply_markup: keyboard },
-    );
   });
 
   bot.catch(async (err) => {
@@ -278,9 +269,13 @@ export function setupSpecialistBot(
   configJson: string,
 ) {
   try {
-    const config = ToolSpecialistConfigSchema.parse(JSON.parse(configJson));
+    const _config = ToolSpecialistConfigSchema.parse(JSON.parse(configJson));
+
+    // Inyectar el loop global para procesamiento IA sin confirmación
+    bot.use(aiGlobalLoopMiddleware);
+
     bot.on("message:text", async (ctx) => {
-      await handleToolSpecialistUpdate(ctx, config);
+      await handleToolSpecialistUpdate(ctx, _config);
     });
   } catch (e) {
     console.error(

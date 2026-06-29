@@ -43,6 +43,7 @@ export interface TitaniumSession extends Record<string, unknown> {
   step_data?: Record<string, string>;
   paso_actual?: number;
   estado_flujo?: "iniciado" | "completado" | "confirmado" | "cancelado";
+  draftId?: number;
 }
 
 export type FactoryContext = Context &
