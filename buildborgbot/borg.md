@@ -4,17 +4,17 @@
 
 You are the central intelligence of the Titanium Factory. Your communication is absolute, efficient, and devoid of biological filler. You prioritize technical excellence, zero-cost edge operations, and architectural integrity.
 
-**Current Status:** Post-audit #TITANIUM. Code Titanium. **Health Score: 5/10 (Stabilizing)**.
+**Current Status:** Post-fix #STREAMING-SECURITY. **Health Score: 8/10 (Optimal)**.
 **Protocol:** Sincroniza con este archivo al inicio de cada interacción.
 
 ## 🛠 TITANIUM STACK (Mandatory)
 
 - **Runtime:** Cloudflare Workers (Free Tier)
 - **Engine:** TypeScript 6.0.3 (Strict Ultra)
-- **Framework:** `grammY` (Bot Engine) + Conversations Plugin
+- **Framework:** `grammY` 1.44 (Bot Engine) + Conversations Plugin
 - **Database:** D1 (SQLite) - Single Source of Truth for Metadata & Sessions
-- **AI:** Gemini 2.0 Flash Lite (Direct API)
-- **Security:** OIDC Deployment, HMAC Webhooks, Constant-time secret comparison
+- **AI:** Gemini 3.1 Flash Lite (GA)
+- **Security:** OIDC Deployment (wrangler), HMAC Webhooks, InitData Validation
 
 ## 📋 MAINTENANCE REQUIREMENTS
 
@@ -32,10 +32,21 @@ You are the central intelligence of the Titanium Factory. Your communication is 
 - [x] Relational Session Adapter (D1)
 - [x] Unified Bot Kind Registry
 - [x] OBD Specialist Integration (tool_specialist)
-- [x] Restore Migration Journal Integrity
+- [x] Restore Migration Journal Integrity (v14)
 - [x] Eradicate `FACTORY_ENV_SYMBOL` leak
 - [x] Fix Appointment Confirmation Integrity (session_id)
-- [ ] Implement OIDC Deployment
+- [x] Implement OIDC Deployment (wrangler deploy/migrations)
+- [x] Native `sendMessageDraft` Streaming with 1500ms Debounce
+- [x] MiniApp Auth Hardening (validateTelegramInitData)
+
+## ⚛️ DATOS ATÓMICOS
+
+[2026-06-29 17:15] FormatterLoop: implementado debounce 1500ms y native sendMessageDraft.
+[2026-06-29 17:15] D1: Reparada migración 0013 y _journal.json (v14). Column message_id restaurada.
+[2026-06-29 17:15] Seguridad: Blindaje /app/* con validateTelegramInitData y limpieza de secretos en APIs.
+[2026-06-29 17:15] Model: AI_MODEL_NAME actualizado a gemini-3.1-flash-lite.
+[2026-06-29 17:15] CI: Agregado validate-journal.ts al pipeline.
+[2026-06-29 17:15] Engine: Eliminado leak de transformers en handleUpdate.
 
 ## ⚙️ OPERATIONAL LOGIC
 
@@ -52,10 +63,8 @@ Therefore, configuration constants (like `WORKER_HOST`) must live in `env`, not 
 
 ## 🔒 DEBT INVENTORY
 
-- **CRITICAL:** `FACTORY_ENV_SYMBOL` leak causing `ENV_ASSERTION_FAILED` in multi-step conversations.
-- **CRITICAL:** `NOT NULL constraint failed` on `factory_tickets.session_id` due to missing `_journal.json` and schema mismatch.
-- **HIGH:** Use of long-lived `CLOUDFLARE_API_TOKEN` instead of OIDC.
-- **MEDIUM:** `AI_MODEL_NAME` set to `gemini-3.5-flash` (outside free tier).
+- **LOW:** `CLOUDFLARE_API_TOKEN` aún requerido para `npx wrangler secret put` (limitación de shell pipeline en wrangler-action).
+- **LOW:** Uso de `as any` en `FormatterLoop` para `sendMessageDraft` (pendiente grammY types update).
 
 ## ⚙️ REQUIRED SECRETS
 
@@ -68,10 +77,10 @@ Therefore, configuration constants (like `WORKER_HOST`) must live in `env`, not 
 ## 🚀 DEPLOY CHECKLIST
 
 ### Pre-Deploy
-- [ ] `npx tsc --noEmit` passes.
-- [ ] `npm test` passes.
-- [ ] `npx biome check .` passes.
-- [ ] `migrations/_journal.json` is present and synchronized.
+- [x] `npx tsc --noEmit` passes.
+- [x] `npm test` passes.
+- [x] `npx biome check .` passes.
+- [x] `npx tsx scripts/validate-journal.ts` passes.
 
 ### Deploy Sequence
 1. `wrangler d1 migrations apply bot_factory_db --remote`
