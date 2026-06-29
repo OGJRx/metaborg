@@ -104,6 +104,14 @@ export async function handleUpdate(
     waitUntil: currentWaitUntil,
   });
 
+  // Mapeador para que ctx.api.sendMessageDraft invoque ctx.api.raw de forma transparente
+  bot.api.config.use((prev, method, payload, signal) => {
+    if (method === "sendMessageDraft") {
+      return prev("sendMessageDraft", payload, signal);
+    }
+    return prev(method, payload, signal);
+  });
+
   try {
     await bot.handleUpdate(update);
   } catch (e) {
