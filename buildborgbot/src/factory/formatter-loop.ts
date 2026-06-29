@@ -76,7 +76,8 @@ export class FormatterLoop {
             parse_mode: "HTML",
           });
           if (isFinal) {
-            await ctx.reply(safeText, { parse_mode: "HTML" });
+            const sent = await ctx.reply(safeText, { parse_mode: "HTML" });
+            editMessageId = sent.message_id;
           }
           lastDeliveredText = safeText;
           return;
@@ -116,10 +117,13 @@ export class FormatterLoop {
 
       if (fallbackMode === "CONSOLIDATED") {
         if (isFinal) {
-          await ctx.reply(safeText, { parse_mode: "HTML" }).catch(async () => {
-            const plainText = text.replace(/<[^>]*>/g, "");
-            await ctx.reply(plainText);
-          });
+          const sent = await ctx
+            .reply(safeText, { parse_mode: "HTML" })
+            .catch(async () => {
+              const plainText = text.replace(/<[^>]*>/g, "");
+              return await ctx.reply(plainText);
+            });
+          if (sent) editMessageId = sent.message_id;
         }
       }
     };
@@ -150,9 +154,14 @@ export class FormatterLoop {
       // Persist final message
       await this.db
         .prepare(
-          "INSERT INTO factory_messages (bot_id, chat_id, role, content) VALUES (?, ?, 'model', ?)",
+          "INSERT INTO factory_messages (bot_id, chat_id, message_id, role, content) VALUES (?, ?, ?, 'model', ?)",
         )
-        .bind(this.botId, String(this.chatId), accumulatedText)
+        .bind(
+          this.botId,
+          String(this.chatId),
+          editMessageId ?? -1,
+          accumulatedText,
+        )
         .run()
         .catch((err) =>
           console.error("[D1 Save] Error saving final message:", err),
