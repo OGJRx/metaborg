@@ -51,7 +51,9 @@ export class FormatterLoop {
   }
 
   public async execute(ctx: FactoryContext, userInput: string): Promise<void> {
-    const draftId = ctx.session.draftId || Math.floor(Math.random() * 1000000);
+    const draftId =
+      ctx.session.draftId ||
+      Number.parseInt(crypto.randomUUID().split("-")[0] ?? "0", 16);
     ctx.session.draftId = draftId;
 
     let accumulatedText = "";
@@ -62,23 +64,25 @@ export class FormatterLoop {
     let lastDeliveredText = "";
     let lastDeliveryTimestamp = 0;
 
+    let pendingFlush: Promise<void> = Promise.resolve();
+
     const deliverPayload = async (text: string, isFinal = false) => {
       const safeText = this.balanceHtmlTags(text);
       if (safeText === lastDeliveredText && !isFinal) return;
 
       if (fallbackMode === "DRAFT") {
         try {
-          // biome-ignore lint/suspicious/noExplicitAny: grammY 1.44 native support
-          await (ctx.api as any).sendMessageDraft({
-            chat_id: this.chatId,
-            draft_id: draftId,
-            text: safeText,
-            parse_mode: "HTML",
-          });
-          if (isFinal) {
-            const sent = await ctx.reply(safeText, { parse_mode: "HTML" });
-            editMessageId = sent.message_id;
-          }
+          // biome-ignore lint/suspicious/noExplicitAny: sendMessageDraft positional args & is_final
+          await (ctx.api as any).sendMessageDraft(
+            this.chatId,
+            draftId,
+            safeText,
+            {
+              parse_mode: "HTML",
+              is_final: isFinal,
+            },
+          );
+
           lastDeliveredText = safeText;
           return;
         } catch (err) {
@@ -124,12 +128,20 @@ export class FormatterLoop {
               return await ctx.reply(plainText);
             });
           if (sent) editMessageId = sent.message_id;
+        } else {
+          // If we are in consolidated mode but not final, we might want to skip or just log
+          // But to be safe and responsive, we can try to send a message if we don't have one yet
+          if (editMessageId === null) {
+            const sent = await ctx.reply(safeText, { parse_mode: "HTML" });
+            editMessageId = sent.message_id;
+          }
         }
+        lastDeliveredText = safeText;
       }
     };
 
     // Initial feedback
-    ctx.waitUntil(deliverPayload("<i>Procesando... 🕛</i>"));
+    await deliverPayload("<i>Procesando... 🕛</i>");
 
     try {
       const stream = getGeminiStream(this.config, userInput);
@@ -145,11 +157,27 @@ export class FormatterLoop {
         // Debounce delivery: 1500ms or newline
         if (now - lastDeliveryTimestamp > 1500 || chunk.includes("\n")) {
           lastDeliveryTimestamp = now;
-          ctx.waitUntil(deliverPayload(accumulatedText));
+          pendingFlush = pendingFlush.then(() =>
+            deliverPayload(accumulatedText),
+          );
+          await pendingFlush;
         }
       }
 
+      // Final delivery
       await deliverPayload(accumulatedText, true);
+
+      // If we only used DRAFT mode, we need to send the final message as a real message
+      // so it stays in the history and we get a message_id
+      if (fallbackMode === "DRAFT") {
+        const finalMsg = await ctx.reply(
+          this.balanceHtmlTags(accumulatedText),
+          {
+            parse_mode: "HTML",
+          },
+        );
+        editMessageId = finalMsg.message_id;
+      }
 
       // Persist final message
       await this.db

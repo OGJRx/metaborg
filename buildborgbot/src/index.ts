@@ -78,6 +78,14 @@ export default {
   ): Promise<Response> {
     const url = new URL(request.url);
 
+    // Root redirect or simple response
+    if (url.pathname === "/") {
+      return new Response("Titanium Factory OK", {
+        status: 200,
+        headers: { "content-type": "text/plain" },
+      });
+    }
+
     // Health Check
     if (url.pathname === "/api/health") {
       try {
