@@ -172,9 +172,9 @@ export class FormatterLoop {
         // Debounce delivery: 1500ms or newline
         if (now - lastDeliveryTimestamp > 1500 || chunk.includes("\n")) {
           lastDeliveryTimestamp = now;
-          pendingFlush = pendingFlush.then(() =>
-            deliverPayload(accumulatedText),
-          );
+          pendingFlush = pendingFlush.then(async () => {
+            await deliverPayload(accumulatedText);
+          });
           await pendingFlush;
         }
       }
