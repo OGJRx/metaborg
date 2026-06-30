@@ -15,7 +15,7 @@ export class RelationalSessionAdapter
 
     const row = await this.db
       .prepare(
-        "SELECT step_data, paso_actual FROM factory_sessions WHERE chat_id = ? AND bot_id = ? AND estado_flujo = 'activo' LIMIT 1",
+        "SELECT step_data, paso_actual FROM factory_sessions WHERE chat_id = ? AND bot_id = ? AND estado_flujo = 'activo' ORDER BY updated_at DESC LIMIT 1",
       )
       .bind(chatId, botId)
       .first<{ step_data: string; paso_actual: number }>();
