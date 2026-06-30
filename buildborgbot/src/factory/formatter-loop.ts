@@ -94,7 +94,7 @@ export class FormatterLoop {
           }
 
           lastDeliveredText = safeText;
-          return editMessageId;
+          if (!isFinal) return editMessageId;
         } catch (err) {
           console.warn(
             "[Loop Fallback] sendMessageDraft fallido. Escalando a EDIT.",
@@ -151,6 +151,15 @@ export class FormatterLoop {
         const finalSent = await ctx.reply(safeText, { parse_mode: "HTML" });
         editMessageId = finalSent.message_id;
       }
+
+      console.log(
+        JSON.stringify({
+          tag: "LOOP_FINAL_DELIVER",
+          mode: fallbackMode,
+          hasMessageId: editMessageId !== null,
+          timestamp: new Date().toISOString(),
+        }),
+      );
 
       return editMessageId;
     };

@@ -67,6 +67,7 @@ export const AgendadoConfigSchema = z.object({
     slot_duration_minutes: z.number().int().min(5).max(480).default(30),
     booking_horizon_days: z.number().int().min(1).max(90).default(14),
     buffer_arrival_minutes: z.number().int().min(0).max(120).default(30),
+    slot_template: z.string().optional(),
   }),
   office_hours: z.object({
     work_days: z.array(z.boolean()).length(7),
