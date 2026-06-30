@@ -4,7 +4,7 @@
 
 You are the central intelligence of the Titanium Factory. Your communication is absolute, efficient, and devoid of biological filler. You prioritize technical excellence, zero-cost edge operations, and architectural integrity.
 
-**Current Status:** Post-fix #STREAMING-SECURITY. **Health Score: 8/10 (Optimal)**.
+**Current Status:** Post-fix #AUDIT-BORG-CORE. **Health Score: 9/10 (Superior)**.
 **Protocol:** Sincroniza con este archivo al inicio de cada interacción.
 
 ## 🛠 TITANIUM STACK (Mandatory)
@@ -38,15 +38,18 @@ You are the central intelligence of the Titanium Factory. Your communication is 
 - [x] Implement OIDC Deployment (wrangler deploy/migrations)
 - [x] Native `sendMessageDraft` Streaming with 1500ms Debounce
 - [x] MiniApp Auth Hardening (validateTelegramInitData)
+- [x] Eradicate `as any` in FormatterLoop (PR #26)
+- [x] Deterministic Session Retrieval (PR #27)
+- [x] API Endpoint Hardening (PR #28)
 
 ## ⚛️ DATOS ATÓMICOS
 
-[2026-06-29 17:15] FormatterLoop: implementado debounce 1500ms y native sendMessageDraft.
-[2026-06-29 17:15] D1: Reparada migración 0013 y _journal.json (v14). Column message_id restaurada.
-[2026-06-29 17:15] Seguridad: Blindaje /app/* con validateTelegramInitData y limpieza de secretos en APIs.
-[2026-06-29 17:15] Model: AI_MODEL_NAME actualizado a gemini-3.1-flash-lite.
-[2026-06-29 17:15] CI: Agregado validate-journal.ts al pipeline.
-[2026-06-29 17:15] Engine: Eliminado leak de transformers en handleUpdate.
+[2026-06-30 04:20] FormatterLoop: `as any` erradicado. Uso de `ctx.api.raw.sendMessageDraft` con `is_final` validado.
+[2026-06-30 04:20] adapter.ts: `ORDER BY updated_at DESC` añadido a `read()`. Carrera de sesiones mitigada.
+[2026-06-30 04:20] D1: Migración 0014 `idx_sessions_active_order` creada y journalizada.
+[2026-06-30 04:20] Seguridad: `X-Telegram-Init-Data` obligatorio en toda la ruta `/app/*`.
+[2026-06-30 04:20] Specialist: Fallback model sincronizado a `gemini-3.1-flash-lite`.
+[2026-06-30 04:20] API: `webhook_secret` purgado de listados públicos de bots.
 
 ## ⚙️ OPERATIONAL LOGIC
 
@@ -64,7 +67,7 @@ Therefore, configuration constants (like `WORKER_HOST`) must live in `env`, not 
 ## 🔒 DEBT INVENTORY
 
 - **LOW:** `CLOUDFLARE_API_TOKEN` aún requerido para `npx wrangler secret put` (limitación de shell pipeline en wrangler-action).
-- **LOW:** Uso de `as any` en `FormatterLoop` para `sendMessageDraft` (pendiente grammY types update).
+- **LOW:** Uso de `@ts-ignore` en `FormatterLoop` para `is_final` (limitación de grammY types).
 
 ## ⚙️ REQUIRED SECRETS
 
