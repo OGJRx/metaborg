@@ -20,7 +20,7 @@ export async function* getGeminiStream(
     contents: [
       {
         role: "user",
-        parts: [{ text: `${SKILL_FORMAT}\n\nUser Input: ${userInput}` }],
+        parts: [{ text: userInput }],
       },
     ],
     config: {
@@ -28,7 +28,7 @@ export async function* getGeminiStream(
         role: "system",
         parts: [{ text: SKILL_FORMAT }],
       },
-    } as unknown as Record<string, unknown>,
+    },
   });
 
   for await (const chunk of responseStream) {
