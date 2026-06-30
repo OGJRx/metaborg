@@ -72,16 +72,23 @@ export class FormatterLoop {
 
       if (fallbackMode === "DRAFT") {
         try {
-          // biome-ignore lint/suspicious/noExplicitAny: sendMessageDraft positional args & is_final
-          await (ctx.api as any).sendMessageDraft(
-            this.chatId,
-            draftId,
-            safeText,
-            {
-              parse_mode: "HTML",
-              is_final: isFinal,
-            },
-          );
+          const result = await ctx.api.raw.sendMessageDraft({
+            chat_id: this.chatId,
+            draft_id: draftId,
+            text: safeText,
+            parse_mode: "HTML",
+            // @ts-expect-error: is_final is supported by Telegram Draft API but missing in grammY types
+            is_final: isFinal,
+          });
+
+          if (
+            isFinal &&
+            result &&
+            typeof result === "object" &&
+            "message_id" in result
+          ) {
+            editMessageId = (result as { message_id: number }).message_id;
+          }
 
           lastDeliveredText = safeText;
           return;
@@ -129,12 +136,7 @@ export class FormatterLoop {
             });
           if (sent) editMessageId = sent.message_id;
         } else {
-          // If we are in consolidated mode but not final, we might want to skip or just log
-          // But to be safe and responsive, we can try to send a message if we don't have one yet
-          if (editMessageId === null) {
-            const sent = await ctx.reply(safeText, { parse_mode: "HTML" });
-            editMessageId = sent.message_id;
-          }
+          return;
         }
         lastDeliveredText = safeText;
       }
@@ -166,18 +168,6 @@ export class FormatterLoop {
 
       // Final delivery
       await deliverPayload(accumulatedText, true);
-
-      // If we only used DRAFT mode, we need to send the final message as a real message
-      // so it stays in the history and we get a message_id
-      if (fallbackMode === "DRAFT") {
-        const finalMsg = await ctx.reply(
-          this.balanceHtmlTags(accumulatedText),
-          {
-            parse_mode: "HTML",
-          },
-        );
-        editMessageId = finalMsg.message_id;
-      }
 
       // Persist final message
       await this.db

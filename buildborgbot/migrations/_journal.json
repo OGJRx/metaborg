@@ -70,6 +70,11 @@
       "version": "14",
       "name": "0013_update_messages_for_fragments.sql",
       "checksum": "64b3cb7beb86a7a0cb72c965566125901d1c708e"
+    },
+    {
+      "version": "15",
+      "name": "0014_deterministic_sessions.sql",
+      "checksum": "b2505991e00fb836ad5f369643ea394b3f08d232"
     }
   ]
 }

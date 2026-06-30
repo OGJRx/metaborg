@@ -116,13 +116,16 @@ export default {
         .replace(/^\//, "");
 
       const initData = request.headers.get("X-Telegram-Init-Data");
+      if (!initData)
+        return new Response("Unauthorized: Missing Init Data", { status: 401 });
 
       if (slug === "botfather") {
         if (
-          !initData ||
           !(await validateTelegramInitData(initData, env.TELEGRAM_BOT_TOKEN))
         ) {
-          return new Response("Unauthorized", { status: 401 });
+          return new Response("Unauthorized: Invalid Init Data", {
+            status: 401,
+          });
         }
 
         const bots = await env.DB.prepare(
@@ -156,11 +159,10 @@ export default {
       if (bot.token && bot.token_iv) {
         const key = await deriveKey(env.TITANIUM_API_SECRET);
         const plainToken = await decrypt(bot.token, bot.token_iv, key);
-        if (
-          !initData ||
-          !(await validateTelegramInitData(initData, plainToken))
-        ) {
-          return new Response("Unauthorized", { status: 401 });
+        if (!(await validateTelegramInitData(initData, plainToken))) {
+          return new Response("Unauthorized: Invalid Bot Init Data", {
+            status: 401,
+          });
         }
       }
 
@@ -625,7 +627,7 @@ export default {
         return new Response("Unauthorized", { status: 401 });
       }
       const bots = await env.DB.prepare(
-        "SELECT bot_id, bot_name, token_var_name, system_prompt, welcome_message, menu_json, slug FROM factory_bots",
+        "SELECT bot_id, bot_name, token_var_name, system_prompt, welcome_message, menu_json, slug, bot_kind, created_at, updated_at FROM factory_bots",
       ).all();
       return Response.json(bots.results);
     }

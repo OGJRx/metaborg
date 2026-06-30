@@ -52,7 +52,7 @@ export async function handleToolSpecialistUpdate(
     const result = await generateAIResponse(ctx.env.DB, {
       botId: ctx.botId,
       apiKey: ctx.env.GEMINI_API_KEY,
-      model: ctx.env.AI_MODEL_NAME || "gemini-1.5-flash",
+      model: ctx.env.AI_MODEL_NAME || "gemini-3.1-flash-lite",
       contents: [
         {
           role: "user",
