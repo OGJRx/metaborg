@@ -17,11 +17,11 @@ export class FormatterLoop {
     const sanitized = input
       .replace(/&(?!amp;|lt;|gt;|quot;|apos;|#\d+;)/g, "&amp;")
       .replace(
-        /<(?![/]?(b|strong|i|em|u|s|strike|del|span|pre|code|a)\b)/gi,
+        /<(?!\/?(b|strong|i|em|u|s|strike|del|span|pre|code|a)\b)/gi,
         "&lt;",
       )
       .replace(
-        /(?<!<(b|strong|i|em|u|s|strike|del|span|pre|code|a)\b[^>]*)>/gi,
+        /(?<!<\/?(b|strong|i|em|u|s|strike|del|span|pre|code|a)\b[^>]*)>/gi,
         "&gt;",
       );
 
@@ -66,9 +66,12 @@ export class FormatterLoop {
 
     let pendingFlush: Promise<void> = Promise.resolve();
 
-    const deliverPayload = async (text: string, isFinal = false) => {
+    const deliverPayload = async (
+      text: string,
+      isFinal = false,
+    ): Promise<number | null> => {
       const safeText = this.balanceHtmlTags(text);
-      if (safeText === lastDeliveredText && !isFinal) return;
+      if (safeText === lastDeliveredText && !isFinal) return editMessageId;
 
       if (fallbackMode === "DRAFT") {
         try {
@@ -77,7 +80,7 @@ export class FormatterLoop {
             draft_id: draftId,
             text: safeText,
             parse_mode: "HTML",
-            // @ts-expect-error: is_final is supported by Telegram Draft API but missing in grammY types
+            // @ts-expect-error: is_final is supported by Telegram Draft API
             is_final: isFinal,
           });
 
@@ -91,7 +94,7 @@ export class FormatterLoop {
           }
 
           lastDeliveredText = safeText;
-          return;
+          return editMessageId;
         } catch (err) {
           console.warn(
             "[Loop Fallback] sendMessageDraft fallido. Escalando a EDIT.",
@@ -115,7 +118,7 @@ export class FormatterLoop {
             );
           }
           lastDeliveredText = safeText;
-          return;
+          return editMessageId;
         } catch (err) {
           console.warn(
             "[Loop Fallback] editMessageText falló. Escalando a CONSOLIDATED.",
@@ -136,10 +139,20 @@ export class FormatterLoop {
             });
           if (sent) editMessageId = sent.message_id;
         } else {
-          return;
+          return editMessageId;
         }
         lastDeliveredText = safeText;
       }
+
+      // If we are at the end (isFinal) and we STILL don't have an editMessageId,
+      // it means DRAFT consolidated but didn't return an ID, or some other edge case.
+      // We MUST have an ID for persistence.
+      if (isFinal && editMessageId === null) {
+        const finalSent = await ctx.reply(safeText, { parse_mode: "HTML" });
+        editMessageId = finalSent.message_id;
+      }
+
+      return editMessageId;
     };
 
     // Initial feedback
@@ -167,6 +180,7 @@ export class FormatterLoop {
       }
 
       // Final delivery
+      await pendingFlush; // Ensure all non-final flushes finished
       await deliverPayload(accumulatedText, true);
 
       // Persist final message
