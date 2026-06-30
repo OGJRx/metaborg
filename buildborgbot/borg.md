@@ -50,6 +50,10 @@ You are the central intelligence of the Titanium Factory. Your communication is 
 [2026-06-30 04:20] Seguridad: `X-Telegram-Init-Data` obligatorio en toda la ruta `/app/*`.
 [2026-06-30 04:20] Specialist: Fallback model sincronizado a `gemini-3.1-flash-lite`.
 [2026-06-30 04:20] API: `webhook_secret` purgado de listados públicos de bots.
+[2026-06-30 05:45] FormatterLoop: Regex de balanceo HTML corregido (soporte para `</tag>`).
+[2026-06-30 05:45] FormatterLoop: Entrega final dedupeda (eliminación de eco doble/triple).
+[2026-06-30 05:45] D1: Columna `message_id` añadida manualmente a producción para corregir migración 0013 parcial.
+[2026-06-30 05:45] TS: Error de tipos en cadena de `pendingFlush` resuelto.
 
 ## ⚙️ OPERATIONAL LOGIC
 
