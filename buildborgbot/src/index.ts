@@ -115,7 +115,13 @@ export default {
         .replace(/\/+/g, "/")
         .replace(/^\//, "");
 
-      const initData = request.headers.get("X-Telegram-Init-Data");
+      let initData = request.headers.get("X-Telegram-Init-Data");
+      if (!initData) {
+        initData =
+          url.searchParams.get("tgWebAppInitData") ||
+          url.searchParams.get("tgWebAppData");
+      }
+
       if (!initData)
         return new Response("Unauthorized: Missing Init Data", { status: 401 });
 
@@ -179,7 +185,13 @@ export default {
     }
 
     if (url.pathname === "/api/miniapp/config" && request.method === "POST") {
-      const initData = request.headers.get("X-Telegram-Init-Data");
+      let initData = request.headers.get("X-Telegram-Init-Data");
+      if (!initData) {
+        initData =
+          url.searchParams.get("tgWebAppInitData") ||
+          url.searchParams.get("tgWebAppData");
+      }
+
       if (!initData) return new Response("Missing initData", { status: 401 });
 
       const params = new URLSearchParams(initData);

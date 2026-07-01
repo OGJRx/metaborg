@@ -80,10 +80,7 @@ export function setupBotFather(_botId: string, bot: Bot<FactoryContext>) {
 
     for (const bot of results) {
       list += `• ${bot.bot_name} (<code>${bot.slug}</code>)\n`;
-      keyboard
-        .webApp("⚙️ Config", `https://${host}/app/${bot.slug}`)
-        .webApp("🚀 Profunda", `https://${host}/app/${bot.slug}?action=deep`)
-        .row();
+      keyboard.webApp("🛠️ Editor", `https://${host}/app/${bot.slug}`).row();
     }
 
     await ctx.reply(list, { parse_mode: "HTML", reply_markup: keyboard });
@@ -189,13 +186,7 @@ export function setupBotFather(_botId: string, bot: Bot<FactoryContext>) {
         const host = ctx.env.WORKER_HOST;
         for (const bot of results) {
           list += `• ${bot.bot_name} (<code>${bot.slug}</code>)\n`;
-          keyboard
-            .webApp("⚙️ Config", `https://${host}/app/${bot.slug}`)
-            .webApp(
-              "🚀 Profunda",
-              `https://${host}/app/${bot.slug}?action=deep`,
-            )
-            .row();
+          keyboard.webApp("🛠️ Editor", `https://${host}/app/${bot.slug}`).row();
         }
         await ctx.reply(list, { parse_mode: "HTML", reply_markup: keyboard });
       }
