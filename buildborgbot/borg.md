@@ -41,6 +41,7 @@ You are the central intelligence of the Titanium Factory. Your communication is 
 - [x] Eradicate `as any` in FormatterLoop (PR #26)
 - [x] Deterministic Session Retrieval (PR #27)
 - [x] API Endpoint Hardening (PR #28)
+- [x] Eradicate MiniApp escaping bugs in `main.ts` (Biome Fix)
 
 ## ⚛️ DATOS ATÓMICOS
 
@@ -72,6 +73,7 @@ Therefore, configuration constants (like `WORKER_HOST`) must live in `env`, not 
 
 - **LOW:** `CLOUDFLARE_API_TOKEN` aún requerido para `npx wrangler secret put` (limitación de shell pipeline en wrangler-action).
 - **LOW:** Uso de `@ts-ignore` en `FormatterLoop` para `is_final` (limitación de grammY types).
+- **MEDIUM:** MiniApp `main.ts` refactor (Option C) — Extract to `main.client.ts` with esbuild to eliminate embedded string technical debt.
 
 ## ⚙️ REQUIRED SECRETS
 
