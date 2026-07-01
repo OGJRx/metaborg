@@ -76,20 +76,15 @@ export function setupBotFather(_botId: string, bot: Bot<FactoryContext>) {
 
     const keyboard = new InlineKeyboard();
     let list = "<b>Tus Bots:</b>\n\n";
+    const host = ctx.env.WORKER_HOST;
+
     for (const bot of results) {
       list += `• ${bot.bot_name} (<code>${bot.slug}</code>)\n`;
+      keyboard
+        .webApp("⚙️ Config", `https://${host}/app/${bot.slug}`)
+        .webApp("🚀 Profunda", `https://${host}/app/${bot.slug}?action=deep`)
+        .row();
     }
-
-    const cbCustomize = await buildCallback(
-      ctx.env.DB,
-      ctx.env.TITANIUM_API_SECRET,
-      {
-        bot_id: "botfather",
-        action: "bf_customize",
-        payload: "",
-      },
-    );
-    keyboard.text("🛠️ Personalizar", cbCustomize);
 
     await ctx.reply(list, { parse_mode: "HTML", reply_markup: keyboard });
   });
@@ -182,7 +177,6 @@ export function setupBotFather(_botId: string, bot: Bot<FactoryContext>) {
       );
     } else if (action === "bf_mybots") {
       await ctx.answerCallbackQuery();
-      // Re-trigger the logic of /mybots
       const bots = await ctx.env.DB.prepare(
         "SELECT bot_name, slug FROM factory_bots",
       ).all<{ bot_name: string; slug: string }>();
@@ -192,21 +186,17 @@ export function setupBotFather(_botId: string, bot: Bot<FactoryContext>) {
       } else {
         const keyboard = new InlineKeyboard();
         let list = "<b>Tus Bots:</b>\n\n";
+        const host = ctx.env.WORKER_HOST;
         for (const bot of results) {
           list += `• ${bot.bot_name} (<code>${bot.slug}</code>)\n`;
+          keyboard
+            .webApp("⚙️ Config", `https://${host}/app/${bot.slug}`)
+            .webApp(
+              "🚀 Profunda",
+              `https://${host}/app/${bot.slug}?action=deep`,
+            )
+            .row();
         }
-        const cbCustomize = await buildCallback(db, apiSecret, {
-          bot_id: "botfather",
-          action: "bf_customize",
-          payload: "",
-        });
-        const cbDeep = await buildCallback(db, apiSecret, {
-          bot_id: "botfather",
-          action: "bf_deep_personalization",
-          payload: "",
-        });
-        keyboard.text("🛠️ Editar", cbCustomize);
-        keyboard.text("🚀 Personalización Profunda", cbDeep);
         await ctx.reply(list, { parse_mode: "HTML", reply_markup: keyboard });
       }
     } else if (action === "bf_help") {
