@@ -4,6 +4,7 @@ import { SKILL_FORMAT } from "./skill-format";
 export interface StreamConfig {
   apiKey: string;
   modelName: string;
+  systemInstruction?: string;
 }
 
 export async function* getGeminiStream(
@@ -26,7 +27,7 @@ export async function* getGeminiStream(
     config: {
       systemInstruction: {
         role: "system",
-        parts: [{ text: SKILL_FORMAT }],
+        parts: [{ text: config.systemInstruction || SKILL_FORMAT }],
       },
     },
   });

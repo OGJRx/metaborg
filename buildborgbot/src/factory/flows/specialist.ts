@@ -1,4 +1,4 @@
-import { generateAIResponse } from "../ai-client";
+import { FormatterLoop } from "../formatter-loop";
 import type { FactoryContext } from "../types";
 
 export async function handleToolSpecialistUpdate(
@@ -32,6 +32,14 @@ export async function handleToolSpecialistUpdate(
       }
 
       if (dbResults.length > 0) {
+        console.log(
+          JSON.stringify({
+            tag: "OBD_LOOKUP",
+            codes: uniqueCodes,
+            count: dbResults.length,
+            timestamp: new Date().toISOString(),
+          }),
+        );
         prompt += `\n\nDATOS OBD DEL TALLER:\n${dbResults.join("\n")}`;
       }
     } else {
@@ -48,20 +56,15 @@ export async function handleToolSpecialistUpdate(
     }
   }
 
-  try {
-    const result = await generateAIResponse(ctx.env.DB, {
-      botId: ctx.botId,
-      apiKey: ctx.env.GEMINI_API_KEY,
-      model: ctx.env.AI_MODEL_NAME || "gemini-3.1-flash-lite",
-      contents: [
-        {
-          role: "user",
-          parts: [{ text: prompt }, { text: `USUARIO: ${text}` }],
-        },
-      ],
-    });
+  if (!ctx.chat) return;
 
-    await ctx.reply(result.text);
+  try {
+    const formatter = new FormatterLoop(ctx.env.DB, ctx.chat.id, ctx.botId, {
+      apiKey: ctx.env.GEMINI_API_KEY,
+      modelName: ctx.env.AI_MODEL_NAME || "gemini-3.1-flash-lite",
+      systemInstruction: prompt,
+    });
+    await formatter.execute(ctx, text);
   } catch (e) {
     console.error("AI Error:", e);
     await ctx.reply("⚠️ Error procesando con IA.");

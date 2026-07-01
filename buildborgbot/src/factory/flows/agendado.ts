@@ -1,4 +1,5 @@
 import type { z } from "zod";
+import { notifyFactoryOfTicket } from "../notifications/factory-notify";
 import type { AgendadoConfigSchema, StepSchema } from "../schemas";
 import type { FactoryContext, TitaniumSession } from "../types";
 import { getRenderAdapter, type RenderAdapter } from "./render-adapter";
@@ -238,23 +239,23 @@ async function handleConfirmation(
 
   session.estado_flujo = "confirmado";
 
-  // Notify Admin (Simple implementation for now)
-  try {
-    const adminMsg = `🆕 <b>NUEVA CITA CONFIRMADA</b>\n\nBot: ${config.business_identity.name}\nTicket: <code>${res.ticketId}</code>\nPlataforma: ${platform}\nUsuario: ${ctx.chat?.id}\n\n<b>Detalles:</b>\n${Object.entries(
-      session.step_data || {},
-    )
-      .map(([k, v]) => `• ${k}: ${v}`)
-      .join("\n")}`;
-    // In a real scenario, we'd lookup admin IDs from factory_platform_config
-    console.log("Admin Notification:", adminMsg);
-  } catch (e) {
-    console.error("Failed to send admin notification:", e);
-  }
+  // Notify Factory Bot (Admin Notification)
+  ctx.waitUntil(
+    notifyFactoryOfTicket(ctx.env, ctx.botId, config.business_identity.name, {
+      ticketId: res.ticketId || "ERR",
+      fechaCita: fechaCita || "N/A",
+      horaCita: horaCita || "N/A",
+      stepData: session.step_data || {},
+    }),
+  );
 
-  return await adapter.renderConfirmation({
+  return await adapter.renderImprovedConfirmation({
     ctx,
     config,
     ticketId: res.ticketId || "ERR",
+    fechaCita: fechaCita || "N/A",
+    horaCita: horaCita || "N/A",
+    stepData: session.step_data || {},
     text: "",
     options: undefined,
   });
