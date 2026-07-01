@@ -22,6 +22,14 @@ export abstract class RenderAdapter {
   abstract renderConfirmation(
     opts: RenderOptions & { ticketId: string },
   ): Promise<void>;
+  abstract renderImprovedConfirmation(
+    opts: RenderOptions & {
+      ticketId: string;
+      fechaCita: string;
+      horaCita: string;
+      stepData: Record<string, string>;
+    },
+  ): Promise<void>;
   abstract renderCancellation(opts: RenderOptions): Promise<void>;
 }
 
@@ -88,6 +96,52 @@ export class TelegramRenderAdapter extends RenderAdapter {
         },
       );
     }
+  }
+
+  async renderImprovedConfirmation(
+    opts: RenderOptions & {
+      ticketId: string;
+      fechaCita: string;
+      horaCita: string;
+      stepData: Record<string, string>;
+    },
+  ): Promise<void> {
+    const timezone = opts.config.office_hours.timezone || "America/Caracas";
+    const nombre = opts.stepData.nombre || "Cliente";
+    const servicio = opts.stepData.servicio || "Servicio seleccionado";
+    const vehiculo =
+      opts.stepData.vehiculo ||
+      (opts.stepData.placa
+        ? `${opts.stepData.marca || ""} ${opts.stepData.modelo || ""} (${opts.stepData.placa})`.trim()
+        : null);
+
+    let summary = "✅ <b>CITA CONFIRMADA</b>\n\n";
+    summary += `🎫 <b>Ticket:</b> <code>${opts.ticketId}</code>\n`;
+    summary += `👤 <b>Cliente:</b> ${nombre}\n`;
+    summary += `🔧 <b>Servicio:</b> ${servicio}\n`;
+    if (vehiculo) summary += `🚗 <b>Vehículo:</b> ${vehiculo}\n`;
+    summary += `📅 <b>Fecha:</b> ${opts.fechaCita}\n`;
+    summary += `⏰ <b>Hora:</b> ${opts.horaCita} (${timezone})\n`;
+    if (opts.stepData.notas) {
+      summary += `📝 <b>Notas:</b> ${opts.stepData.notas}\n`;
+    }
+
+    summary += `\n<i>${opts.config.business_identity.protocol_message || "Te esperamos."}</i>`;
+
+    const keyboard = new InlineKeyboard();
+    if (opts.config.business_identity.location_maps_url) {
+      keyboard.url(
+        "🌐 Ver en Google Maps",
+        opts.config.business_identity.location_maps_url,
+      );
+    }
+
+    await opts.ctx.reply(summary, {
+      parse_mode: "HTML",
+      ...(keyboard.inline_keyboard.length > 0
+        ? { reply_markup: keyboard }
+        : {}),
+    });
   }
 
   async renderCancellation(opts: RenderOptions): Promise<void> {
@@ -172,6 +226,33 @@ export class WhatsAppRenderAdapter extends RenderAdapter {
       .replace(`${"${"}ticketId}`, opts.ticketId)
       .replace(/<[^>]*>/g, "");
     await opts.ctx.reply(`✅ ${msg}`);
+    if (opts.config.business_identity.location_maps_url) {
+      await opts.ctx.reply(
+        `📍 Ubicación: ${opts.config.business_identity.location_maps_url}`,
+      );
+    }
+  }
+
+  async renderImprovedConfirmation(
+    opts: RenderOptions & {
+      ticketId: string;
+      fechaCita: string;
+      horaCita: string;
+      stepData: Record<string, string>;
+    },
+  ): Promise<void> {
+    const nombre = opts.stepData.nombre || "Cliente";
+    const servicio = opts.stepData.servicio || "Servicio seleccionado";
+    const msg =
+      `✅ *CITA CONFIRMADA*\n\n` +
+      `*Ticket:* ${opts.ticketId}\n` +
+      `*Cliente:* ${nombre}\n` +
+      `*Servicio:* ${servicio}\n` +
+      `*Fecha:* ${opts.fechaCita}\n` +
+      `*Hora:* ${opts.horaCita}\n\n` +
+      `_Te esperamos._`;
+
+    await opts.ctx.reply(msg);
     if (opts.config.business_identity.location_maps_url) {
       await opts.ctx.reply(
         `📍 Ubicación: ${opts.config.business_identity.location_maps_url}`,

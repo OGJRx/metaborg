@@ -32,9 +32,14 @@ export function setupBotFather(_botId: string, bot: Bot<FactoryContext>) {
       action: "bf_help",
       payload: "",
     });
-    const cbCustomize = await buildCallback(db, apiSecret, {
+    const _cbCustomize = await buildCallback(db, apiSecret, {
       bot_id: "botfather",
       action: "bf_customize",
+      payload: "",
+    });
+    const cbDeep = await buildCallback(db, apiSecret, {
+      bot_id: "botfather",
+      action: "bf_deep_personalization",
       payload: "",
     });
 
@@ -43,7 +48,7 @@ export function setupBotFather(_botId: string, bot: Bot<FactoryContext>) {
       .row()
       .text("📋 Mis Bots", cbBots)
       .row()
-      .text("⚙️ Personalización Profunda", cbCustomize)
+      .text("🚀 Personalización Profunda", cbDeep)
       .row()
       .text("❓ Ayuda", cbHelp);
 
@@ -146,6 +151,22 @@ export function setupBotFather(_botId: string, bot: Bot<FactoryContext>) {
     if (action === "bf_newbot") {
       await ctx.answerCallbackQuery();
       await ctx.conversation.enter("newBotConversation");
+    } else if (action === "bf_deep_personalization") {
+      await ctx.answerCallbackQuery();
+      await ctx.reply(
+        "🚀 <b>PERSONALIZACIÓN PROFUNDA</b>\n\nEste comando abre el motor de configuración avanzada. ¿Qué bot deseas personalizar?",
+        {
+          parse_mode: "HTML",
+          reply_markup: new InlineKeyboard().text(
+            "📋 Ver Mis Bots",
+            await buildCallback(db, apiSecret, {
+              bot_id: "botfather",
+              action: "bf_mybots",
+              payload: "",
+            }),
+          ),
+        },
+      );
     } else if (action === "bf_customize") {
       await ctx.answerCallbackQuery();
       const host = ctx.env.WORKER_HOST;
@@ -179,7 +200,13 @@ export function setupBotFather(_botId: string, bot: Bot<FactoryContext>) {
           action: "bf_customize",
           payload: "",
         });
-        keyboard.text("🛠️ Personalizar", cbCustomize);
+        const cbDeep = await buildCallback(db, apiSecret, {
+          bot_id: "botfather",
+          action: "bf_deep_personalization",
+          payload: "",
+        });
+        keyboard.text("🛠️ Editar", cbCustomize);
+        keyboard.text("🚀 Personalización Profunda", cbDeep);
         await ctx.reply(list, { parse_mode: "HTML", reply_markup: keyboard });
       }
     } else if (action === "bf_help") {

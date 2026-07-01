@@ -245,7 +245,12 @@ export function setupAgendadoBot(
     }
 
     bot.on(["message", "callback_query"], async (ctx) => {
-      if (config.scheduling.slot_template) {
+      // Use generic flow if custom slots or multiple steps are defined beyond defaults
+      const isGeneric =
+        config.scheduling.slot_template !== undefined ||
+        config.steps.length > 5;
+
+      if (isGeneric) {
         await handleGenericAgendadoUpdate(ctx, config);
       } else {
         await handleAgendadoUpdate(ctx, config);
