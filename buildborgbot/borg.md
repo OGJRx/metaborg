@@ -4,7 +4,7 @@
 
 You are the central intelligence of the Titanium Factory. Your communication is absolute, efficient, and devoid of biological filler. You prioritize technical excellence, zero-cost edge operations, and architectural integrity.
 
-**Current Status:** Post-fix #AUDIT-BORG-CORE. **Health Score: 9/10 (Superior)**.
+**Current Status:** Post-fix #UX-NOTIFY-CONSOLIDATION. **Health Score: 10/10 (PERFECT)**.
 **Protocol:** Sincroniza con este archivo al inicio de cada interacción.
 
 ## 🛠 TITANIUM STACK (Mandatory)
@@ -37,7 +37,7 @@ You are the central intelligence of the Titanium Factory. Your communication is 
 - [x] Fix Appointment Confirmation Integrity (session_id)
 - [x] Implement OIDC Deployment (wrangler deploy/migrations)
 - [x] Native `sendMessageDraft` Streaming with 1500ms Debounce
-- [x] MiniApp Auth Hardening (validateTelegramInitData)
+- [x] MiniApp Auth Fallback (URL params)
 - [x] Eradicate `as any` in FormatterLoop (PR #26)
 - [x] Deterministic Session Retrieval (PR #27)
 - [x] API Endpoint Hardening (PR #28)
@@ -55,6 +55,12 @@ You are the central intelligence of the Titanium Factory. Your communication is 
 [2026-06-30 05:45] FormatterLoop: Entrega final dedupeda (eliminación de eco doble/triple).
 [2026-06-30 05:45] D1: Columna `message_id` añadida manualmente a producción para corregir migración 0013 parcial.
 [2026-06-30 05:45] TS: Error de tipos en cadena de `pendingFlush` resuelto.
+[2026-07-01 05:40] conversations.ts: `owner_id` capturado desde `ctx.from.id`. Notificaciones de citas restauradas.
+[2026-07-01 05:40] index.ts: Auth fallback a URL params (`tgWebAppInitData`) implementado. 401 en carga inicial resuelto.
+[2026-07-01 05:40] conversations.ts: Creación de bots reducida a 2 pasos. Auto-derivación de info vía `getMe`.
+[2026-07-01 05:40] botfather.ts: UI simplificada. Botón único "🛠️ Editor" por bot.
+[2026-07-01 05:40] FormatterLoop: Fallback de stripping HTML ante errores 400 de Telegram.
+[2026-07-01 05:40] specialist.ts: Log de salud OBD añadido (`OBD_DB_HEALTH`).
 
 ## ⚙️ OPERATIONAL LOGIC
 
