@@ -185,7 +185,7 @@ const SchedulingTab = (s) => html\`
             <input type="number" .value=\${s.config.scheduling.slot_duration_minutes} @input=\${e => { s.config.scheduling.slot_duration_minutes = parseInt(e.target.value); renderApp(); }}>
         </div>
         <div class="form-group">
-            <label>Plantilla de Turno (ej: \${'\\${'}time})</label>
+            <label>Plantilla de Turno (ej: \${'\\$'+'{'}time})</label>
             <input type="text" .value=\${s.config.scheduling.slot_template || ''} @input=\${e => { s.config.scheduling.slot_template = e.target.value; renderApp(); }}>
         </div>
         <div class="form-group">
