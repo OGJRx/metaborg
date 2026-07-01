@@ -32,11 +32,16 @@ export async function handleToolSpecialistUpdate(
       }
 
       if (dbResults.length > 0) {
+        const totalRow = await ctx.env.DB.prepare(
+          "SELECT COUNT(*) as c FROM factory_obd_codes",
+        ).first<{ c: number }>();
+
         console.log(
           JSON.stringify({
-            tag: "OBD_LOOKUP",
-            codes: uniqueCodes,
-            count: dbResults.length,
+            tag: "OBD_DB_HEALTH",
+            totalCodes: totalRow?.c ?? 0,
+            codesQueried: uniqueCodes.length,
+            codesFound: dbResults.length,
             timestamp: new Date().toISOString(),
           }),
         );

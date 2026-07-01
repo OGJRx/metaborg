@@ -46,12 +46,7 @@ export async function handleAgendadoUpdate(
   }
 
   // Handle Start
-  if (
-    ctx.hasCommand("start") ||
-    (session.paso_actual === 0 &&
-      !callbackData &&
-      (!session.step_data || Object.keys(session.step_data).length === 0))
-  ) {
+  if (ctx.hasCommand("start")) {
     session.paso_actual = 0;
     session.step_data = {};
     session.estado_flujo = "iniciado";
@@ -154,8 +149,10 @@ export async function handleAgendadoUpdate(
       }
     }
 
-    // Normal text/number input
-    return await processStepInput(ctx, config, session, adapter, text.trim());
+    // Normal text/number input - only if step expects text/number
+    if (currentStep.type === "text" || currentStep.type === "number") {
+      return await processStepInput(ctx, config, session, adapter, text.trim());
+    }
   }
 }
 

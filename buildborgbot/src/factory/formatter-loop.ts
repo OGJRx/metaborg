@@ -96,6 +96,20 @@ export class FormatterLoop {
           lastDeliveredText = safeText;
           if (!isFinal) return editMessageId;
         } catch (err) {
+          if (String(err).includes("can't parse entities")) {
+            const plainText = text.replace(/<[^>]*>/g, "");
+            await ctx.api.raw.sendMessageDraft({
+              chat_id: this.chatId,
+              draft_id: draftId,
+              text: plainText,
+              // @ts-expect-error: is_final is supported by Telegram Draft API
+              is_final: isFinal,
+            });
+            console.warn(
+              "[Loop] HTML inválido en DRAFT. Reintentado como texto plano.",
+            );
+            return editMessageId;
+          }
           console.warn(
             "[Loop Fallback] sendMessageDraft fallido. Escalando a EDIT.",
             String(err),
@@ -120,6 +134,21 @@ export class FormatterLoop {
           lastDeliveredText = safeText;
           return editMessageId;
         } catch (err) {
+          if (
+            String(err).includes("can't parse entities") &&
+            editMessageId !== null
+          ) {
+            const plainText = text.replace(/<[^>]*>/g, "");
+            await ctx.api.editMessageText(
+              this.chatId,
+              editMessageId,
+              plainText,
+            );
+            console.warn(
+              "[Loop] HTML inválido en EDIT. Reintentado como texto plano.",
+            );
+            return editMessageId;
+          }
           console.warn(
             "[Loop Fallback] editMessageText falló. Escalando a CONSOLIDATED.",
             String(err),

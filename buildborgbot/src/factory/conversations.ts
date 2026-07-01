@@ -62,34 +62,7 @@ export async function newBotConversation(
   );
   await kindCtx.answerCallbackQuery();
 
-  await kindCtx.reply("🆔 Ingresa el ID único del bot (slug):", {
-    parse_mode: "HTML",
-  });
-  const botIdCtx = await conversation.waitFor("message:text", {
-    maxMilliseconds: 5 * 60 * 1000,
-  });
-  const botId = botIdCtx.message.text.trim();
-
-  // Validation: alpha-numeric, underscores, dashes, 1-64 chars.
-  const botIdRegex = /^[a-zA-Z0-9_-]{1,64}$/;
-  const reservedSlugs = ["botfather", "api", "health", "webhook"];
-  if (!botIdRegex.test(botId) || reservedSlugs.includes(botId.toLowerCase())) {
-    await botIdCtx.reply(
-      "❌ <b>ID INVÁLIDO</b>\n\nEl ID solo puede contener letras, números, guiones y guiones bajos (máx 64 caracteres), y no puede ser una palabra reservada. Reinicia el proceso con /newbot.",
-      { parse_mode: "HTML" },
-    );
-    return;
-  }
-
-  await botIdCtx.reply("📛 Ingresa el nombre público del bot:", {
-    parse_mode: "HTML",
-  });
-  const botNameCtx = await conversation.waitFor("message:text", {
-    maxMilliseconds: 5 * 60 * 1000,
-  });
-  const botName = botNameCtx.message.text;
-
-  await botNameCtx.reply(
+  await kindCtx.reply(
     "🔑 Ingresa el <b>Telegram Bot Token</b> (ej: <code>12345:ABCDE...</code>):",
     {
       parse_mode: "HTML",
@@ -98,14 +71,36 @@ export async function newBotConversation(
   const botTokenCtx = await conversation.waitFor("message:text", {
     maxMilliseconds: 5 * 60 * 1000,
   });
-  const botToken = botTokenCtx.message.text;
+  const botToken = botTokenCtx.message.text.trim();
+
+  await botTokenCtx.reply("⏳ Validando token y obteniendo información...");
+
+  let botInfo: { id: number; first_name: string; username?: string };
+  try {
+    const res = await fetch(`https://api.telegram.org/bot${botToken}/getMe`);
+    const data = (await res.json()) as {
+      ok: boolean;
+      result: { id: number; first_name: string; username?: string };
+    };
+    if (!data.ok) throw new Error("Token inválido");
+    botInfo = data.result;
+  } catch (_err) {
+    await botTokenCtx.reply(
+      "❌ <b>TOKEN INVÁLIDO</b>\n\nNo se pudo obtener información del bot. Verifica el token y reinicia con /newbot.",
+      { parse_mode: "HTML" },
+    );
+    return;
+  }
+
+  const botName = botInfo.first_name;
+  const botId = botInfo.username || `bot_${botInfo.id}`;
 
   let systemPrompt = "";
   let liveCtx = botTokenCtx;
 
   if (botKind === "open_chat") {
     await botTokenCtx.reply(
-      "📜 Ingresa el System Prompt (instrucciones de IA):",
+      `📜 <b>Bot: ${botName}</b>\n\nIngresa el System Prompt (instrucciones de IA). Si deseas usar el valor por defecto, escribe "skip":`,
       {
         parse_mode: "HTML",
       },
@@ -113,13 +108,16 @@ export async function newBotConversation(
     const promptCtx = await conversation.waitFor("message:text", {
       maxMilliseconds: 5 * 60 * 1000,
     });
-    systemPrompt = promptCtx.message.text;
+    systemPrompt =
+      promptCtx.message.text.toLowerCase() === "skip"
+        ? "Eres un asistente útil y estratégico."
+        : promptCtx.message.text;
     liveCtx = promptCtx;
   } else if (botKind === "tool_specialist") {
     systemPrompt = AGENT_PROMPTS.OBD_DIAGNOSTICO;
   }
 
-  await liveCtx.reply("⏳ Procesando creación...");
+  await liveCtx.reply("⏳ Procesando registro en la colmena...");
 
   try {
     // Assert environment on the latest context to ensure live bindings
@@ -139,6 +137,7 @@ export async function newBotConversation(
           : `¡Hola! Soy ${botName}. ¿En qué puedo ayudarte?`,
         menu_json: "[]",
         bot_kind: botKind,
+        owner_id: liveCtx.from?.id,
         config_json: isAgendado
           ? JSON.stringify(agendadoConfig)
           : JSON.stringify({
