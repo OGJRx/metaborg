@@ -27,8 +27,8 @@ export async function notifyFactoryOfTicket(
     const ownerId = bot.owner_id;
 
     // 2. Build notification message
-    const nombre = ticket.stepData.nombre || "Cliente";
-    const servicio = ticket.stepData.servicio || "Servicio general";
+    const nombre = ticket.stepData["nombre"] || "Cliente";
+    const servicio = ticket.stepData["servicio"] || "Servicio general";
 
     const message =
       `🔔 <b>NUEVA CITA — ${botName}</b>\n\n` +

@@ -107,12 +107,12 @@ export class TelegramRenderAdapter extends RenderAdapter {
     },
   ): Promise<void> {
     const timezone = opts.config.office_hours.timezone || "America/Caracas";
-    const nombre = opts.stepData.nombre || "Cliente";
-    const servicio = opts.stepData.servicio || "Servicio seleccionado";
+    const nombre = opts.stepData["nombre"] || "Cliente";
+    const servicio = opts.stepData["servicio"] || "Servicio seleccionado";
     const vehiculo =
-      opts.stepData.vehiculo ||
-      (opts.stepData.placa
-        ? `${opts.stepData.marca || ""} ${opts.stepData.modelo || ""} (${opts.stepData.placa})`.trim()
+      opts.stepData["vehiculo"] ||
+      (opts.stepData["placa"]
+        ? `${opts.stepData["marca"] || ""} ${opts.stepData["modelo"] || ""} (${opts.stepData["placa"]})`.trim()
         : null);
 
     let summary = "✅ <b>CITA CONFIRMADA</b>\n\n";
@@ -122,8 +122,8 @@ export class TelegramRenderAdapter extends RenderAdapter {
     if (vehiculo) summary += `🚗 <b>Vehículo:</b> ${vehiculo}\n`;
     summary += `📅 <b>Fecha:</b> ${opts.fechaCita}\n`;
     summary += `⏰ <b>Hora:</b> ${opts.horaCita} (${timezone})\n`;
-    if (opts.stepData.notas) {
-      summary += `📝 <b>Notas:</b> ${opts.stepData.notas}\n`;
+    if (opts.stepData["notas"]) {
+      summary += `📝 <b>Notas:</b> ${opts.stepData["notas"]}\n`;
     }
 
     summary += `\n<i>${opts.config.business_identity.protocol_message || "Te esperamos."}</i>`;
@@ -241,8 +241,8 @@ export class WhatsAppRenderAdapter extends RenderAdapter {
       stepData: Record<string, string>;
     },
   ): Promise<void> {
-    const nombre = opts.stepData.nombre || "Cliente";
-    const servicio = opts.stepData.servicio || "Servicio seleccionado";
+    const nombre = opts.stepData["nombre"] || "Cliente";
+    const servicio = opts.stepData["servicio"] || "Servicio seleccionado";
     const msg =
       `✅ *CITA CONFIRMADA*\n\n` +
       `*Ticket:* ${opts.ticketId}\n` +
