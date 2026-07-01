@@ -4,6 +4,7 @@ import { InlineKeyboard } from "grammy";
 import { buildCallback, parseCallback } from "./callback";
 import { feedbackConversation } from "./conversations";
 import { handleAgendadoUpdate } from "./flows/agendado";
+import { handleGenericAgendadoUpdate } from "./flows/agendado-generic";
 import { handleToolSpecialistUpdate } from "./flows/specialist";
 import {
   handleAction,
@@ -244,7 +245,11 @@ export function setupAgendadoBot(
     }
 
     bot.on(["message", "callback_query"], async (ctx) => {
-      await handleAgendadoUpdate(ctx, config);
+      if (config.scheduling.slot_template) {
+        await handleGenericAgendadoUpdate(ctx, config);
+      } else {
+        await handleAgendadoUpdate(ctx, config);
+      }
     });
   } catch (e) {
     console.error(`Failed to parse agendado config for bot ${botId}: ${e}`);
@@ -270,9 +275,6 @@ export function setupSpecialistBot(
 ) {
   try {
     const _config = ToolSpecialistConfigSchema.parse(JSON.parse(configJson));
-
-    // Inyectar el loop global para procesamiento IA sin confirmación
-    bot.use(aiGlobalLoopMiddleware);
 
     bot.on("message:text", async (ctx) => {
       await handleToolSpecialistUpdate(ctx, _config);
