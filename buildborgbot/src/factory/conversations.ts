@@ -45,6 +45,20 @@ export async function newBotConversation(
     await kindCtx.answerCallbackQuery();
   }
 
+  // Type defense for selection
+  if (
+    typeof selection !== "string" ||
+    ![
+      "open_chat",
+      "agendado_generic",
+      "agendado_workshop",
+      "tool_specialist",
+    ].includes(selection)
+  ) {
+    await ctx.reply("❌ Selección inválida. Reinicia con /newbot.");
+    return;
+  }
+
   const isAgendado =
     selection === "agendado_generic" || selection === "agendado_workshop";
   const botKind = isAgendado
