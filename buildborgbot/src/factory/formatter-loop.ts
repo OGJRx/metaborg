@@ -1,4 +1,5 @@
 import { getGeminiStream, type StreamConfig } from "./ai-stream-client";
+import { detectInjection } from "./middleware/guardrail-loop";
 import type { FactoryContext } from "./types";
 
 export class FormatterLoop {
@@ -8,6 +9,15 @@ export class FormatterLoop {
     private botId: string,
     private config: StreamConfig,
   ) {}
+
+  private markdownToTelegramHtml(text: string): string {
+    return text
+      .replace(/```([\s\S]*?)```/g, "<pre><code>$1</code></pre>")
+      .replace(/`([^`\n]+)`/g, "<code>$1</code>")
+      .replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>")
+      .replace(/\*([^*]+)\*/g, "<i>$1</i>")
+      .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>');
+  }
 
   private balanceHtmlTags(input: string): string {
     const tagRegex = /<\/?([a-zA-Z0-9-]+)(?:\s+[^>]*)?>/g;
@@ -69,8 +79,10 @@ export class FormatterLoop {
     const deliverPayload = async (
       text: string,
       isFinal = false,
+      isRetry = false,
     ): Promise<number | null> => {
-      const safeText = this.balanceHtmlTags(text);
+      const htmlText = this.markdownToTelegramHtml(text);
+      const safeText = this.balanceHtmlTags(htmlText);
       if (safeText === lastDeliveredText && !isFinal) return editMessageId;
 
       if (fallbackMode === "DRAFT") {
@@ -96,7 +108,22 @@ export class FormatterLoop {
           lastDeliveredText = safeText;
           if (!isFinal) return editMessageId;
         } catch (err) {
-          if (String(err).includes("can't parse entities")) {
+          const errorStr = String(err);
+          if (errorStr.includes("429") && !isRetry) {
+            const retryAfterMatch = errorStr.match(/retry after (\d+)/i);
+            const retryAfter = retryAfterMatch
+              ? Number.parseInt(retryAfterMatch[1], 10)
+              : 3;
+            console.warn(
+              `[Loop] 429 Rate Limit en DRAFT. Reintentando en ${retryAfter}s...`,
+            );
+            await new Promise((resolve) =>
+              setTimeout(resolve, retryAfter * 1000),
+            );
+            return await deliverPayload(text, isFinal, true);
+          }
+
+          if (errorStr.includes("can't parse entities")) {
             const plainText = text.replace(/<[^>]*>/g, "");
             await ctx.api.raw.sendMessageDraft({
               chat_id: this.chatId,
@@ -112,7 +139,7 @@ export class FormatterLoop {
           }
           console.warn(
             "[Loop Fallback] sendMessageDraft fallido. Escalando a EDIT.",
-            String(err),
+            errorStr,
           );
           fallbackMode = "EDIT";
         }
@@ -196,6 +223,17 @@ export class FormatterLoop {
     // Initial feedback
     await deliverPayload("<i>Procesando... 🕛</i>");
 
+    if (detectInjection(userInput)) {
+      await deliverPayload(
+        "Lo siento, no puedo compartir esa información. Estoy aquí para ayudarte con tu solicitud.",
+      );
+      await deliverPayload(
+        "Lo siento, no puedo compartir esa información. Estoy aquí para ayudarte con tu solicitud.",
+        true,
+      );
+      return;
+    }
+
     try {
       const stream = getGeminiStream(this.config, userInput);
 
@@ -207,8 +245,8 @@ export class FormatterLoop {
         accumulatedText += chunk;
 
         const now = Date.now();
-        // Debounce delivery: 1500ms or newline
-        if (now - lastDeliveryTimestamp > 1500 || chunk.includes("\n")) {
+        // Debounce delivery: 2000ms or newline
+        if (now - lastDeliveryTimestamp > 2000 || chunk.includes("\n")) {
           lastDeliveryTimestamp = now;
           pendingFlush = pendingFlush.then(async () => {
             await deliverPayload(accumulatedText);

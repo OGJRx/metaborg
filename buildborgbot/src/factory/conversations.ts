@@ -15,29 +15,35 @@ import { InlineKeyboard } from "grammy";
 export async function newBotConversation(
   conversation: Convo,
   ctx: FactoryContext,
+  initialKind?: string,
 ): Promise<void> {
-  await ctx.reply(
-    "🆕 <b>NUEVO BOT BORG</b>\n\nSelecciona el tipo de bot que deseas crear:",
-    {
-      parse_mode: "HTML",
-      reply_markup: new InlineKeyboard()
-        .text("💬 Chat Abierto (IA)", "kind:open_chat")
-        .row()
-        .text("📅 Agendado Nuevo", "kind:agendado_generic")
-        .row()
-        .text("🚗 Agendado Taller Mecánico", "kind:agendado_workshop")
-        .row()
-        .text("🔧 Especialista Taller (IA+OBD)", "kind:tool_specialist"),
-    },
-  );
+  let selection = initialKind;
 
-  const kindCtx = await conversation.waitForCallbackQuery(/^kind:/, {
-    maxMilliseconds: 5 * 60 * 1000,
-  });
+  if (!selection) {
+    await ctx.reply(
+      "🆕 <b>NUEVO BOT BORG</b>\n\nSelecciona el tipo de bot que deseas crear:",
+      {
+        parse_mode: "HTML",
+        reply_markup: new InlineKeyboard()
+          .text("💬 Chat Abierto (IA)", "kind:open_chat")
+          .row()
+          .text("📅 Agendado Nuevo", "kind:agendado_generic")
+          .row()
+          .text("🚗 Agendado Taller Mecánico", "kind:agendado_workshop")
+          .row()
+          .text("🔧 Especialista Taller (IA+OBD)", "kind:tool_specialist"),
+      },
+    );
 
-  // Defense: extract selection directly from callback data, don't rely on regex match array in re-entries
-  const callbackData = kindCtx.callbackQuery?.data || "";
-  const selection = callbackData.replace(/^kind:/, "") || "open_chat";
+    const kindCtx = await conversation.waitForCallbackQuery(/^kind:/, {
+      maxMilliseconds: 5 * 60 * 1000,
+    });
+
+    // Defense: extract selection directly from callback data, don't rely on regex match array in re-entries
+    const callbackData = kindCtx.callbackQuery?.data || "";
+    selection = callbackData.replace(/^kind:/, "") || "open_chat";
+    await kindCtx.answerCallbackQuery();
+  }
 
   const isAgendado =
     selection === "agendado_generic" || selection === "agendado_workshop";
@@ -60,9 +66,8 @@ export async function newBotConversation(
       timestamp: new Date().toISOString(),
     }),
   );
-  await kindCtx.answerCallbackQuery();
 
-  await kindCtx.reply(
+  await ctx.reply(
     "🔑 Ingresa el <b>Telegram Bot Token</b> (ej: <code>12345:ABCDE...</code>):",
     {
       parse_mode: "HTML",

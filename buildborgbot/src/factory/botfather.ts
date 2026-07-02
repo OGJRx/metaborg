@@ -22,6 +22,11 @@ export function setupBotFather(_botId: string, bot: Bot<FactoryContext>) {
       action: "bf_newbot",
       payload: "",
     });
+    const cbTemplates = await buildCallback(db, apiSecret, {
+      bot_id: "botfather",
+      action: "bf_templates",
+      payload: "",
+    });
     const cbBots = await buildCallback(db, apiSecret, {
       bot_id: "botfather",
       action: "bf_mybots",
@@ -45,6 +50,7 @@ export function setupBotFather(_botId: string, bot: Bot<FactoryContext>) {
 
     const keyboard = new InlineKeyboard()
       .text("🆕 Crear Bot", cbNew)
+      .text("📋 Plantillas", cbTemplates)
       .row()
       .text("📋 Mis Bots", cbBots)
       .row()
@@ -143,6 +149,55 @@ export function setupBotFather(_botId: string, bot: Bot<FactoryContext>) {
     if (action === "bf_newbot") {
       await ctx.answerCallbackQuery();
       await ctx.conversation.enter("newBotConversation");
+    } else if (action === "bf_templates") {
+      await ctx.answerCallbackQuery();
+      const kbOpenChat = await buildCallback(db, apiSecret, {
+        bot_id: "botfather",
+        action: "bf_newbot_template",
+        payload: "open_chat",
+      });
+      const kbAgendado = await buildCallback(db, apiSecret, {
+        bot_id: "botfather",
+        action: "bf_newbot_template",
+        payload: "agendado_generic",
+      });
+      const kbWorkshop = await buildCallback(db, apiSecret, {
+        bot_id: "botfather",
+        action: "bf_newbot_template",
+        payload: "agendado_workshop",
+      });
+      const kbSpecialist = await buildCallback(db, apiSecret, {
+        bot_id: "botfather",
+        action: "bf_newbot_template",
+        payload: "tool_specialist",
+      });
+
+      await ctx.reply(
+        "📋 <b>GALERÍA DE PLANTILLAS</b>\n\n" +
+          "<b>1. Chat Abierto (IA)</b>\n" +
+          "Ideal para atención al cliente general o asistentes personales. Tú defines su personalidad.\n\n" +
+          "<b>2. Agendado Nuevo</b>\n" +
+          "Sistema de citas genérico personalizable para cualquier rubro (estética, consultoría, etc).\n\n" +
+          "<b>3. Agendado Taller</b>\n" +
+          "Plantilla optimizada para talleres mecánicos, con pasos predefinidos para vehículos.\n\n" +
+          "<b>4. Especialista Taller (IA+OBD)</b>\n" +
+          "El bot más avanzado. Combina IA con base de datos de códigos OBD para diagnóstico técnico.",
+        {
+          parse_mode: "HTML",
+          reply_markup: new InlineKeyboard()
+            .text("💬 IA", kbOpenChat)
+            .text("📅 Citas", kbAgendado)
+            .row()
+            .text("🚗 Taller", kbWorkshop)
+            .text("🔧 Especialista", kbSpecialist),
+        },
+      );
+    } else if (action === "bf_newbot_template") {
+      await ctx.answerCallbackQuery();
+      const template = parsed.payload;
+      await ctx.conversation.enter("newBotConversation", {
+        args: [template],
+      });
     } else if (action === "bf_deep_personalization") {
       await ctx.answerCallbackQuery();
       await ctx.reply(
