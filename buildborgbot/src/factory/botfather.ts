@@ -17,11 +17,6 @@ export function setupBotFather(_botId: string, bot: Bot<FactoryContext>) {
     const db = ctx.env.DB;
     const apiSecret = ctx.env.TITANIUM_API_SECRET;
 
-    const cbNew = await buildCallback(db, apiSecret, {
-      bot_id: "botfather",
-      action: "bf_newbot",
-      payload: "",
-    });
     const cbTemplates = await buildCallback(db, apiSecret, {
       bot_id: "botfather",
       action: "bf_templates",
@@ -37,24 +32,13 @@ export function setupBotFather(_botId: string, bot: Bot<FactoryContext>) {
       action: "bf_help",
       payload: "",
     });
-    const _cbCustomize = await buildCallback(db, apiSecret, {
-      bot_id: "botfather",
-      action: "bf_customize",
-      payload: "",
-    });
-    const cbDeep = await buildCallback(db, apiSecret, {
-      bot_id: "botfather",
-      action: "bf_deep_personalization",
-      payload: "",
-    });
 
+    const host = ctx.env.WORKER_HOST;
     const keyboard = new InlineKeyboard()
-      .text("🆕 Crear Bot", cbNew)
-      .text("📋 Plantillas", cbTemplates)
-      .row()
+      .text("📋 Plantillas Bots", cbTemplates)
       .text("📋 Mis Bots", cbBots)
       .row()
-      .text("🚀 Personalización Profunda", cbDeep)
+      .webApp("🚀 Personalización Profunda", `https://${host}/app/botfather`)
       .row()
       .text("❓ Ayuda", cbHelp);
 
@@ -80,14 +64,17 @@ export function setupBotFather(_botId: string, bot: Bot<FactoryContext>) {
       return await ctx.reply("No tienes bots registrados.");
     }
 
-    const keyboard = new InlineKeyboard();
     let list = "<b>Tus Bots:</b>\n\n";
     const host = ctx.env.WORKER_HOST;
 
     for (const bot of results) {
       list += `• ${bot.bot_name} (<code>${bot.slug}</code>)\n`;
-      keyboard.webApp("🛠️ Editor", `https://${host}/app/${bot.slug}`).row();
     }
+
+    const keyboard = new InlineKeyboard().webApp(
+      "🛠️ Editor",
+      `https://${host}/app/botfather`,
+    );
 
     await ctx.reply(list, { parse_mode: "HTML", reply_markup: keyboard });
   });
@@ -146,10 +133,7 @@ export function setupBotFather(_botId: string, bot: Bot<FactoryContext>) {
 
     const { action } = parsed;
 
-    if (action === "bf_newbot") {
-      await ctx.answerCallbackQuery();
-      await ctx.conversation.enter("newBotConversation");
-    } else if (action === "bf_templates") {
+    if (action === "bf_templates") {
       await ctx.answerCallbackQuery();
       const kbOpenChat = await buildCallback(db, apiSecret, {
         bot_id: "botfather",
@@ -195,38 +179,7 @@ export function setupBotFather(_botId: string, bot: Bot<FactoryContext>) {
     } else if (action === "bf_newbot_template") {
       await ctx.answerCallbackQuery();
       const template = parsed.payload;
-      await ctx.conversation.enter("newBotConversation", {
-        args: [template],
-      });
-    } else if (action === "bf_deep_personalization") {
-      await ctx.answerCallbackQuery();
-      await ctx.reply(
-        "🚀 <b>PERSONALIZACIÓN PROFUNDA</b>\n\nEste comando abre el motor de configuración avanzada. ¿Qué bot deseas personalizar?",
-        {
-          parse_mode: "HTML",
-          reply_markup: new InlineKeyboard().text(
-            "📋 Ver Mis Bots",
-            await buildCallback(db, apiSecret, {
-              bot_id: "botfather",
-              action: "bf_mybots",
-              payload: "",
-            }),
-          ),
-        },
-      );
-    } else if (action === "bf_customize") {
-      await ctx.answerCallbackQuery();
-      const host = ctx.env.WORKER_HOST;
-      await ctx.reply(
-        "🛠️ <b>PLATAFORMA DE PERSONALIZACIÓN</b>\n\nAccede al editor profundo para gestionar todos tus bots:",
-        {
-          parse_mode: "HTML",
-          reply_markup: new InlineKeyboard().webApp(
-            "Abrir Panel de Control",
-            `https://${host}/app/botfather`,
-          ),
-        },
-      );
+      await ctx.conversation.enter("newBotConversation", template);
     } else if (action === "bf_mybots") {
       await ctx.answerCallbackQuery();
       const bots = await ctx.env.DB.prepare(
@@ -236,13 +189,15 @@ export function setupBotFather(_botId: string, bot: Bot<FactoryContext>) {
       if (results.length === 0) {
         await ctx.reply("No tienes bots registrados.");
       } else {
-        const keyboard = new InlineKeyboard();
         let list = "<b>Tus Bots:</b>\n\n";
         const host = ctx.env.WORKER_HOST;
         for (const bot of results) {
           list += `• ${bot.bot_name} (<code>${bot.slug}</code>)\n`;
-          keyboard.webApp("🛠️ Editor", `https://${host}/app/${bot.slug}`).row();
         }
+        const keyboard = new InlineKeyboard().webApp(
+          "🛠️ Editor",
+          `https://${host}/app/botfather`,
+        );
         await ctx.reply(list, { parse_mode: "HTML", reply_markup: keyboard });
       }
     } else if (action === "bf_help") {

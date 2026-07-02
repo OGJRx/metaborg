@@ -125,15 +125,14 @@ export default {
       if (!initData)
         return new Response("Unauthorized: Missing Init Data", { status: 401 });
 
-      if (slug === "botfather") {
-        if (
-          !(await validateTelegramInitData(initData, env.TELEGRAM_BOT_TOKEN))
-        ) {
-          return new Response("Unauthorized: Invalid Init Data", {
-            status: 401,
-          });
-        }
+      // Validate Init Data with BotFather token (as MiniApp is opened from BotFather chat)
+      if (!(await validateTelegramInitData(initData, env.TELEGRAM_BOT_TOKEN))) {
+        return new Response("Unauthorized: Invalid Init Data", {
+          status: 401,
+        });
+      }
 
+      if (slug === "botfather") {
         const bots = await env.DB.prepare(
           "SELECT bot_name, bot_kind, config_json, slug FROM factory_bots",
         ).all();
@@ -149,28 +148,16 @@ export default {
       }
 
       const bot = await env.DB.prepare(
-        "SELECT bot_name, bot_kind, config_json, token, token_iv FROM factory_bots WHERE slug = ? OR bot_id = ?",
+        "SELECT bot_name, bot_kind, config_json FROM factory_bots WHERE slug = ? OR bot_id = ?",
       )
         .bind(slug, slug)
         .first<{
           bot_name: string;
           bot_kind: string;
           config_json: string;
-          token: string;
-          token_iv: string;
         }>();
 
       if (!bot) return new Response("Not Found", { status: 404 });
-
-      if (bot.token && bot.token_iv) {
-        const key = await deriveKey(env.TITANIUM_API_SECRET);
-        const plainToken = await decrypt(bot.token, bot.token_iv, key);
-        if (!(await validateTelegramInitData(initData, plainToken))) {
-          return new Response("Unauthorized: Invalid Bot Init Data", {
-            status: 401,
-          });
-        }
-      }
 
       const asset = getMiniAppAsset(
         sanitizedAssetPath,
@@ -203,16 +190,16 @@ export default {
       if (!slug) return new Response("Missing slug", { status: 400 });
 
       const bot = await env.DB.prepare(
-        "SELECT token, token_iv, bot_kind FROM factory_bots WHERE slug = ?",
+        "SELECT bot_kind FROM factory_bots WHERE slug = ?",
       )
         .bind(slug)
-        .first<{ token: string; token_iv: string; bot_kind: string }>();
+        .first<{ bot_kind: string }>();
       if (!bot) return new Response("Bot not found", { status: 404 });
 
-      const key = await deriveKey(env.TITANIUM_API_SECRET);
-      const plainToken = await decrypt(bot.token, bot.token_iv, key);
-
-      const isValid = await validateTelegramInitData(initData, plainToken);
+      const isValid = await validateTelegramInitData(
+        initData,
+        env.TELEGRAM_BOT_TOKEN,
+      );
       if (!isValid) return new Response("Invalid signature", { status: 403 });
 
       interface ConfigPayload {
