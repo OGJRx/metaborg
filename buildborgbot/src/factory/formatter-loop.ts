@@ -111,8 +111,9 @@ export class FormatterLoop {
           const errorStr = String(err);
           if (errorStr.includes("429") && !isRetry) {
             const retryAfterMatch = errorStr.match(/retry after (\d+)/i);
-            const retryAfter = retryAfterMatch
-              ? Number.parseInt(retryAfterMatch[1], 10)
+            const retryAfterStr = retryAfterMatch?.[1];
+            const retryAfter = retryAfterStr
+              ? Number.parseInt(retryAfterStr, 10)
               : 3;
             console.warn(
               `[Loop] 429 Rate Limit en DRAFT. Reintentando en ${retryAfter}s...`,
